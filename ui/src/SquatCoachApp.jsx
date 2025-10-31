@@ -12,25 +12,50 @@ const mockLiveAnalysisData = {
 };
 
 // --- 1. 動作辨識與即時視覺模組 ---
-const LiveVisionModule = ({ action, feedback, isError }) => {
+const LiveVisionModule = ({ action, feedback, isError, poseData }) => { // 🌟 接收 poseData 🌟
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
+  // 🌟 新增 2: 骨架繪製函式 🌟
+  const drawPose = (ctx, data) => {
+    if (!data || data.length === 0) return;
+
+    // 這裡的邏輯是未來組員模型輸出數據後的繪製核心
+    // data 應該是一個包含關鍵點座標和連接線的陣列
+    // 簡單範例：畫一個點
+    // ctx.fillStyle = 'red';
+    // ctx.beginPath();
+    // ctx.arc(data[0].x, data[0].y, 5, 0, 2 * Math.PI);
+    // ctx.fill();
+
+    // 實際整合時，你會在這裡遍歷所有關節點並繪製線段
+  };
+
   useEffect(() => {
-    // 取得鏡頭串流
+    // 取得鏡頭串流的邏輯...
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
           videoRef.current.srcObject = stream;
           videoRef.current.play();
+
+          // 🌟 調整 1: 監聽視訊 metadata 載入完成事件 🌟
+          videoRef.current.onloadedmetadata = () => {
+              const video = videoRef.current;
+              const canvas = canvasRef.current;
+
+              // 將 canvas 的內部解析度設定為與視訊串流相同
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              
+              // 確保 canvas 的 CSS 尺寸與 video 的 CSS 尺寸保持一致 (透過 CSS 處理響應式)
+              // 讓骨架繪製與實際影像同步
+          };
         })
         .catch(err => {
           console.error("無法取得鏡頭權限:", err);
         });
     }
-
-    // 這裡可以加入繪製骨架的邏輯（例如使用 TensorFlow.js 的結果）
-    // 目前僅為佈局，骨架繪製功能將在後續整合
   }, []);
 
   return (

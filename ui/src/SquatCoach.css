@@ -136,3 +136,97 @@
   50% { opacity: 0.8; }
   100% { opacity: 1; }
 }
+
+/* -----------------------------
+   響應式佈局：行動裝置直式 (portrait)
+   - 小螢幕或直式方向時，將主內容改為直式堆疊
+   - 視訊區塊在上，儀表板與回饋系統在下
+   ----------------------------- */
+@media (max-width: 900px), (orientation: portrait) {
+  /* 使 header 與主內容可利用整個視窗高度分配空間 */
+  .squat-coach-app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    box-sizing: border-box;
+    padding: 12px;
+    overflow: hidden; /* 避免整頁滾動 */
+  }
+
+  .squat-coach-app > h1 {
+    margin: 6px 0 8px;
+    font-size: 1.1rem;
+    flex: none;
+  }
+
+  .main-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 0;
+    flex: 1; /* 使用剩餘高度 */
+    min-height: 0; /* 允許子項目在 flexbox 中正確縮放 */
+  }
+
+  /* 視訊區塊置頂，寬度填滿容器 */
+  /* 視訊區塊置頂並占用較小高度，讓下方兩個區塊有空間顯示 */
+  .vision-container {
+    order: 1;
+    flex: 0 0 40%; /* 約 40% 的可用高度 */
+    width: 100%;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0; /* 允許內部 video-wrapper 縮小而不撐開父容器 */
+  }
+
+  /* 右側改為下方區塊，內部項目仍維持垂直排列 */
+  /* 右側改為下方區塊，並垂直平分剩餘高度給儀表板與回饋系統 */
+  .right-panel {
+    order: 2;
+    flex: 1 1 60%; /* 佔用剩餘高度 */
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0; /* 允許內部子項目正確使用 overflow */
+  }
+
+  /* 讓儀表板與回饋系統垂直平分 right-panel 的高度 */
+  .analysis-dashboard,
+  .feedback-system {
+    flex: 1 1 50%;
+    overflow: auto; /* 內容過長時內部滾動，避免整頁被撐大 */
+    padding: 10px;
+  }
+
+  .video-wrapper {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 auto; /* 讓影片區在 vision-container 中可伸縮 */
+    position: relative;
+    min-height: 0; /* 允許 video 在 flexbox 中縮放 */
+    overflow: hidden; /* 避免影片超出並撐開容器 */
+  }
+
+  .live-video, .overlay-canvas {
+    width: 100%;
+    height: 100%; /* 撐滿父容器高度 */
+    max-height: 100%;
+    object-fit: cover;
+    border-radius: 6px;
+    display: block;
+    min-height: 0;
+  }
+
+  .action-status {
+    font-size: 1.05em;
+    padding: 8px;
+  }
+
+  /* 卡片在小螢幕時排成一欄 */
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+}
