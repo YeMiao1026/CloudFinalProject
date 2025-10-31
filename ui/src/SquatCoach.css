@@ -1,0 +1,138 @@
+.squat-coach-app {
+  font-family: Arial, sans-serif;
+  padding: 20px;
+  background-color: #f4f7f9;
+  min-height: 100vh;
+}
+
+.main-content {
+  display: flex;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+/* 左側：視訊與骨架區 */
+.vision-container {
+  flex: 3; /* 佔據較大空間 */
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.video-wrapper {
+  position: relative; /* 確保 canvas 能正確疊加 */
+  width: 100%;
+  max-width: 640px; /* 視訊的最大寬度 */
+  margin: 0 auto;
+}
+
+.live-video, .overlay-canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.overlay-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none; /* 讓滑鼠點擊能穿透 canvas */
+}
+
+.action-status {
+  margin-top: 10px;
+  font-size: 1.2em;
+  text-align: center;
+  padding: 8px;
+  background-color: #e0f7fa;
+  border-radius: 4px;
+}
+
+/* 右側：儀表板與回饋區 */
+.right-panel {
+  flex: 2; /* 佔據較小空間 */
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.analysis-dashboard {
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* 儀表板卡片樣式 */
+.dashboard-card {
+  background-color: #e3f2fd;
+  padding: 15px;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.card-title {
+  font-size: 0.9em;
+  color: #3f51b5;
+  margin-bottom: 5px;
+}
+
+.card-value {
+  font-size: 1.8em;
+  font-weight: bold;
+  color: #1a237e;
+}
+
+/* 智慧回饋系統樣式 */
+.feedback-system {
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.feedback-box {
+  padding: 15px;
+  border-radius: 6px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.feedback-good {
+  background-color: #c8e6c9; /* 綠色背景 */
+  border: 2px solid #388e3c;
+}
+
+.feedback-error {
+  background-color: #ffcdd2; /* 紅色背景 */
+  border: 2px solid #d32f2f;
+  animation: pulse 1s infinite; /* 模擬閃爍提醒 */
+}
+
+.feedback-text {
+  font-size: 1.3em;
+  font-weight: bold;
+  margin: 5px 0 0;
+}
+
+.note-text {
+  font-size: 0.8em;
+  color: #666;
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* 簡單的閃爍動畫 */
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.8; }
+  100% { opacity: 1; }
+}
