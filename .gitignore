@@ -2,7 +2,7 @@
 .venv/venv/env/
 
 # python cache files
-pycache/*.pyc
+__pycache__/*.pyc
 
 # IDE files and System files
 .vscode/.idea/.DS_Store*.swp
