@@ -1,0 +1,51 @@
+name: Update README with commit info
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  update-readme:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Get latest commit info
+        run: |
+          echo "COMMIT_FULL=$(git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "COMMIT_MSG=$(git log -1 --pretty=%s)" >> $GITHUB_ENV
+          echo "COMMIT_AUTHOR=$(git log -1 --pretty='%an')" >> $GITHUB_ENV
+          echo "COMMIT_DATE=$(git log -1 --pretty='%cI')" >> $GITHUB_ENV
+
+      - name: Run update script
+        run: |
+          python tools/update_readme.py
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+      - name: Commit and push README changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: auto-update README with latest commit info"
+            git push
+          else
+            echo "No changes to README.md"
+          fi
