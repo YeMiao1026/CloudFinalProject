@@ -41,3 +41,5 @@ Thumbs.db
 .turbo/
 .pnpm-debug.log*
 
+# 待辦事項  
+Todo.md
