@@ -97,3 +97,24 @@ npm run preview
 ## 聯絡 / 參考
 
 - 若需要整體後端或資料處理相關資訊，請參考專案根目錄的 README 或與專案管理者聯絡。
+
+## Docker 化（建置與執行）
+
+已提供 Docker 設定以便快速在容器中建置與部署前端。
+
+在專案根目錄執行（或在 `ui` 目錄執行並調整路徑）：
+
+```powershell
+# 從專案根目錄
+docker build -t squatcoach-ui -f ui/Dockerfile ./ui
+
+# 以映像建立並啟動容器（將 8080 對外對應到容器 80）
+docker run --rm -p 8080:80 --name squatcoach_ui squatcoach-ui
+
+# 使用 docker-compose（將在根目錄有 docker-compose.yml）
+docker-compose up --build
+```
+
+啟動後，可在瀏覽器開啟 <http://localhost:8080> 檢視應用程式。
+
+備註：Dockerfile 為多階段建置（node -> build -> nginx），並使用 `nginx.conf` 提供 SPA 的 fallback（所有路由導回 index.html）。
