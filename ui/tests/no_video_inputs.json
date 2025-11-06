@@ -1,0 +1,291 @@
+[
+  {
+    "timestamp": "2025-11-06T12:00:00.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 88,
+    "hipAngle": 95,
+    "stability": "良好 (92%)",
+    "feedback": "保持下蹲姿勢",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:02.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 86,
+    "hipAngle": 96,
+    "stability": "良好 (90%)",
+    "feedback": "注意腳跟用力",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:04.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 84,
+    "hipAngle": 94,
+    "stability": "中等 (80%)",
+    "feedback": "背部有點彎曲",
+    "isError": true
+  },
+  {
+    "timestamp": "2025-11-06T12:00:06.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 90,
+    "hipAngle": 97,
+    "stability": "良好 (93%)",
+    "feedback": "很好，維持動作",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:08.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 85,
+    "hipAngle": 95,
+    "stability": "良好 (91%)",
+    "feedback": "膝蓋對齊良好",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:10.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 82,
+    "hipAngle": 92,
+    "stability": "中等 (78%)",
+    "feedback": "髖部向後坐更深",
+    "isError": true
+  },
+  {
+    "timestamp": "2025-11-06T12:00:12.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 88,
+    "hipAngle": 94,
+    "stability": "良好 (89%)",
+    "feedback": "Good form",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:14.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 87,
+    "hipAngle": 95,
+    "stability": "良好 (90%)",
+    "feedback": "繼續保持",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:16.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 83,
+    "hipAngle": 93,
+    "stability": "中等 (77%)",
+    "feedback": "膝蓋稍微內扣",
+    "isError": true
+  },
+  {
+    "timestamp": "2025-11-06T12:00:18.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 89,
+    "hipAngle": 96,
+    "stability": "良好 (94%)",
+    "feedback": "很好",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:20.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 86,
+    "hipAngle": 95,
+    "stability": "良好 (90%)",
+    "feedback": "注意呼吸",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:22.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 81,
+    "hipAngle": 91,
+    "stability": "中等 (75%)",
+    "feedback": "膝蓋過度前傾",
+    "isError": true
+  },
+  {
+    "timestamp": "2025-11-06T12:00:24.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 90,
+    "hipAngle": 98,
+    "stability": "良好 (95%)",
+    "feedback": "姿勢良好",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:26.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 84,
+    "hipAngle": 92,
+    "stability": "中等 (79%)",
+    "feedback": "臀部下沉不足",
+    "isError": true
+  },
+  {
+    "timestamp": "2025-11-06T12:00:28.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 88,
+    "hipAngle": 95,
+    "stability": "良好 (92%)",
+    "feedback": "繼續",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:30.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 85,
+    "hipAngle": 93,
+    "stability": "良好 (90%)",
+    "feedback": "加強核心",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:32.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 82,
+    "hipAngle": 90,
+    "stability": "中等 (76%)",
+    "feedback": "背部略彎",
+    "isError": true
+  },
+  {
+    "timestamp": "2025-11-06T12:00:34.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 89,
+    "hipAngle": 97,
+    "stability": "良好 (93%)",
+    "feedback": "很好",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:36.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 86,
+    "hipAngle": 95,
+    "stability": "良好 (90%)",
+    "feedback": "穩定",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:38.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 83,
+    "hipAngle": 92,
+    "stability": "中等 (78%)",
+    "feedback": "膝蓋內扣",
+    "isError": true
+  },
+  {
+    "timestamp": "2025-11-06T12:00:40.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 90,
+    "hipAngle": 98,
+    "stability": "良好 (95%)",
+    "feedback": "保持",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:42.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 87,
+    "hipAngle": 96,
+    "stability": "良好 (91%)",
+    "feedback": "不錯",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:44.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 84,
+    "hipAngle": 93,
+    "stability": "中等 (80%)",
+    "feedback": "臀部下沉不足",
+    "isError": true
+  },
+  {
+    "timestamp": "2025-11-06T12:00:46.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 89,
+    "hipAngle": 97,
+    "stability": "良好 (93%)",
+    "feedback": "持續加油",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:48.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 85,
+    "hipAngle": 94,
+    "stability": "良好 (90%)",
+    "feedback": "呼吸穩定",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:50.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 82,
+    "hipAngle": 91,
+    "stability": "中等 (77%)",
+    "feedback": "膝蓋稍微內扣",
+    "isError": true
+  },
+  {
+    "timestamp": "2025-11-06T12:00:52.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 88,
+    "hipAngle": 95,
+    "stability": "良好 (92%)",
+    "feedback": "很好",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:54.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 86,
+    "hipAngle": 94,
+    "stability": "良好 (91%)",
+    "feedback": "穩定",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:00:56.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 83,
+    "hipAngle": 92,
+    "stability": "中等 (78%)",
+    "feedback": "背部要直",
+    "isError": true
+  },
+  {
+    "timestamp": "2025-11-06T12:00:58.000Z",
+    "action": "深蹲中",
+    "kneeAngle": 90,
+    "hipAngle": 99,
+    "stability": "良好 (96%)",
+    "feedback": "結束組合，休息",
+    "isError": false
+  }
+  ,
+  {
+    "timestamp": "2025-11-06T12:01:00.000Z",
+    "action": "深蹲結束",
+    "kneeAngle": 0,
+    "hipAngle": 0,
+    "stability": "休息",
+    "feedback": "休息中",
+    "isError": false
+  },
+  {
+    "timestamp": "2025-11-06T12:01:02.000Z",
+    "action": "深蹲結束",
+    "kneeAngle": 0,
+    "hipAngle": 0,
+    "stability": "休息",
+    "feedback": "結束",
+    "isError": false
+  }
+]
