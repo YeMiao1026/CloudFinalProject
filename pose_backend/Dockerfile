@@ -20,20 +20,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy backend code
 COPY . /app
 
-# Create a non-root user and a virtual environment to avoid running pip as root
-RUN groupadd -r app && useradd -r -g app -d /app -s /sbin/nologin app || true
-RUN chown -R app:app /app
-RUN mkdir -p /opt/venv && chown app:app /opt/venv
-
-# Switch to non-root user for Python virtualenv and pip installs
-USER app
-ENV VENV_PATH=/opt/venv
-RUN python -m venv $VENV_PATH
-ENV PATH="$VENV_PATH/bin:$PATH"
-
-# Upgrade pip and install Python dependencies inside the venv
+# Create a virtual environment and install Python dependencies as root so packages
+# are properly installed into the venv. We will drop privileges later.
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip
 RUN if [ -f /app/requirements.txt ]; then pip install --no-cache-dir -r /app/requirements.txt; fi
+
+# Create a non-root user and ensure ownership of app and venv directories
+RUN groupadd -r app && useradd -r -g app -d /app -s /sbin/nologin app || true
+RUN chown -R app:app /app /opt/venv
+
+# Switch to non-root user for runtime
+USER app
+ENV VENV_PATH=/opt/venv
+ENV PATH="$VENV_PATH/bin:$PATH"
 
 # Ensure runtime works as non-root
 WORKDIR /app

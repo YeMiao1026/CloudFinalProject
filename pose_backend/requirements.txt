@@ -6,9 +6,3 @@ Pillow
 mediapipe
 python-multipart
 aiofiles
-fastapi
-uvicorn
-opencv-python
-mediapipe
-numpy
-pillow
