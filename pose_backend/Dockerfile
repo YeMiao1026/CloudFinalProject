@@ -20,14 +20,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy backend code
 COPY . /app
 
-# Install pip and python dependencies
-RUN python -m pip install --upgrade pip
-RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+# Create a non-root user and a virtual environment to avoid running pip as root
+RUN groupadd -r app && useradd -r -g app -d /app -s /sbin/nologin app || true
+RUN chown -R app:app /app
+RUN mkdir -p /opt/venv && chown app:app /opt/venv
+
+# Switch to non-root user for Python virtualenv and pip installs
+USER app
+ENV VENV_PATH=/opt/venv
+RUN python -m venv $VENV_PATH
+ENV PATH="$VENV_PATH/bin:$PATH"
+
+# Upgrade pip and install Python dependencies inside the venv
+RUN pip install --upgrade pip
+RUN if [ -f /app/requirements.txt ]; then pip install --no-cache-dir -r /app/requirements.txt; fi
+
+# Ensure runtime works as non-root
+WORKDIR /app
 
 EXPOSE 8000
 
 # Allow platform to set PORT (e.g., Render sets $PORT). Default to 8000 when not provided.
 ENV PORT=8000
 
-# Run uvicorn, reading PORT from environment
-CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT}"]
+# Run uvicorn, reading PORT from environment (runs as non-root user)
+CMD ["sh", "-c", "$VENV_PATH/bin/python -m uvicorn app:app --host 0.0.0.0 --port ${PORT}"]
