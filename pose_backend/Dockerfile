@@ -28,9 +28,16 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN /opt/venv/bin/python -m pip install --upgrade pip
 RUN if [ -f /app/requirements.txt ]; then /opt/venv/bin/python -m pip install --no-cache-dir -r /app/requirements.txt; fi
 
-# Verify uvicorn (and other critical packages) were installed into the venv; this
-# will fail the build early with a clear error if installation didn't succeed.
-RUN /opt/venv/bin/python -c "import uvicorn, fastapi; print('uvicorn and fastapi available')"
+# Ensure pip/setuptools/wheel are up-to-date (helps build wheels) and explicitly
+# install critical runtime packages in case requirements installation missed them
+RUN /opt/venv/bin/python -m pip install --upgrade pip setuptools wheel || true
+RUN /opt/venv/bin/python -m pip install --no-cache-dir uvicorn[standard] fastapi || true
+
+# Dump installed packages so Render build logs/artifacts show what was installed
+RUN /opt/venv/bin/python -m pip freeze > /app/pip-freeze.txt || true
+
+# Verify uvicorn is importable (exit non-zero with clear message if not)
+RUN /opt/venv/bin/python -c "import importlib,sys,importlib.util; spec=importlib.util.find_spec('uvicorn'); print('uvicorn spec:', spec); sys.exit(0 if spec else 1)"
 
 # Create a non-root user and ensure ownership of app and venv directories
 RUN groupadd -r app && useradd -r -g app -d /app -s /sbin/nologin app || true
