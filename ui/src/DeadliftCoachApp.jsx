@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react"
 import { fetchPoseFromPython } from "./logic/poseBridge.js"
-import "./Deadliftcoach.css"
+import "./DeadliftCoach.css"
 
 const mpEdges = [
   [11, 13], [13, 15],       // 左臂

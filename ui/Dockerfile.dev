@@ -1,0 +1,15 @@
+FROM node:20-bullseye-slim
+
+WORKDIR /app
+
+# Install deps based on lockfile if present
+COPY package.json package-lock.json* ./
+RUN npm ci --silent
+
+# Copy source
+COPY . .
+
+EXPOSE 5173
+
+# Start dev server and listen on all interfaces so host can connect
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

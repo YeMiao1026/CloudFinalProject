@@ -1,8 +1,0 @@
-# python virtual environment
-.venv/venv/env/
-
-# python cache files
-__pycache__/*.pyc
-
-# IDE files and System files
-.vscode/.idea/.DS_Store*.swp
