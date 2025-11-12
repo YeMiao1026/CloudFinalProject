@@ -1,4 +1,12 @@
 // src/logic/poseBridge.js
+// Determine API base URL in this order:
+// 1. Vite build-time env: import.meta.env.VITE_API_BASE (recommended)
+// 2. CRA-style env at build time: process.env.REACT_APP_API_BASE
+// 3. Fallback to localhost:8000 for local development
+const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE) ||
+  (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_BASE) ||
+  'http://127.0.0.1:8000'
+
 export async function fetchPoseFromPython(videoEl) {
   if (!videoEl || !videoEl.videoWidth) {
     console.warn("Video not ready")
@@ -19,7 +27,8 @@ export async function fetchPoseFromPython(videoEl) {
 
   // 傳送到後端 FastAPI
   try {
-    const resp = await fetch("http://127.0.0.1:8000/api/pose", {
+    const url = `${API_BASE.replace(/\/$/, '')}/api/pose`
+    const resp = await fetch(url, {
       method: "POST",
       body: form,
       mode: "cors",
