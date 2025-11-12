@@ -26,5 +26,8 @@ RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.
 
 EXPOSE 8000
 
-# Run uvicorn
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Allow platform to set PORT (e.g., Render sets $PORT). Default to 8000 when not provided.
+ENV PORT=8000
+
+# Run uvicorn, reading PORT from environment
+CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT}"]

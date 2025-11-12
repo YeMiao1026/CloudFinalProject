@@ -1,0 +1,33 @@
+# render.yaml - Render service spec for this repo
+# Adjust 'plan' and repo/branch values as needed in the Render dashboard.
+
+static_sites:
+  - name: cloudfinal-ui
+    repo: https://github.com/YeMiao1026/CloudFinalProject
+    branch: Classroom-demonstration
+    # rootDir points to the folder containing package.json
+    rootDir: ui
+    buildCommand: npm install && npm run build
+    publishPath: ui/dist
+    env:
+      - key: REACT_APP_API_BASE
+        value: "https://api.example.com" # replace after backend is deployed
+
+services:
+  - type: web
+    name: cloudfinal-backend
+    env: docker
+    repo: https://github.com/YeMiao1026/CloudFinalProject
+    branch: Classroom-demonstration
+    dockerfilePath: pose_backend/Dockerfile
+    # plan: free
+    env:
+      - key: PORT
+        value: "8000"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+# Notes:
+# - If you prefer to use Render's dashboard UI, you can create these services there and ignore this file.
+# - Replace api.example.com with the real domain/URL (or use the Render-provided URL).
+# - Render's "free" plan may have limits for CPU/memory and may not be suitable for heavy mediapipe workloads.
