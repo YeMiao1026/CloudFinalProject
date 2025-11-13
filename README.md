@@ -95,3 +95,12 @@ node ui\tests\test_no_video_inputs.js
 ---
 
 如果你要我同時把 `README` 翻成英文或加入更完整的部署範例（像是 production docker-compose 或 CI），我可以接著新增。 
+<!-- AUTO_COMMIT_TRACK_START -->
+
+## 自動提交紀錄（由 workflow 更新）
+
+| 日期 | 提交 | 作者 | 訊息 |
+|------|------|------|------|
+| 2025-11-13T10:01:08+08:00 | [e856d9f](https://github.com/YeMiao1026/CloudFinalProject/commit/e856d9fb8c45ee5350c293729405214ff24d632c) | YeMiao1026 | Merge pull request #1 from YeMiao1026/Classroom-demonstration |
+
+<!-- AUTO_COMMIT_TRACK_END -->
