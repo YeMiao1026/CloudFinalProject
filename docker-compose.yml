@@ -1,0 +1,29 @@
+services:
+  ui:
+    build:
+      context: ./ui
+      # use the dev Dockerfile so the container runs Vite (dev server)
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    restart: unless-stopped
+    volumes:
+      - ./ui:/app:cached
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+  backend:
+    build:
+      context: ./pose_backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    depends_on:
+      - ui
+    environment:
+      - PYTHONUNBUFFERED=1
+    # volumes:
+    #  - ./pose_backend:/app/pose_backend  # optional for dev

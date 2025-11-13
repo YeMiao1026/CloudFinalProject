@@ -2,11 +2,11 @@
 
 ## 專案簡介
 
-待更新
+本專案為一個「硬舉/下蹲姿勢分析」的示範系統，由前端即時擷取影片並呼叫後端的 MediaPipe-based 姿勢偵測 API，回傳關鍵點、角度與即時回饋。
 
-## 專案結構
+主要用途：教學示範與實作練習（包含本地開發與透過 Docker 開發/部署）。
 
-下面列出目前專案的主要目錄與檔案：
+## 目前專案結構（實際）
 
 ```
 README.md
@@ -15,38 +15,83 @@ data/
 	cleaned_videos/
 	labels/
 	raw_videos/
-python/
-	main.py
+pose_backend/
+	app.py                # FastAPI app (後端入口)
+	requirements.txt
 	pyproject.toml
-	README.md
-	
+	Dockerfile
 ui/
+	package.json
+	Dockerfile
+	Dockerfile.dev
+	src/                  # React + Vite 前端程式
+	tests/
 	README.md
+docker-compose.yml
+render.yaml
+tools/
+	update_readme.py
+tests/
+	(repo-level tests)
 ```
 
-說明：
-- `data/`：原始與處理後的影片與標註資料。
-- `python/`：主要後端程式碼與執行入口（`main.py`）。
-- `ui/`：前端或展示用介面程式碼。
+## 快速開始（開發環境）
+
+推薦環境：Python >= 3.10、Node 20.x。以下命令示範在 Windows PowerShell 下的本地啟動步驟。
+
+後端（本地）：
+
+```powershell
+cd pose_backend
+python -m venv .venv
+. .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+# 從 pose_backend 執行 uvicorn
+uvicorn app:app --reload --host 0.0.0.0 --port 8000
+```
+
+前端（本地開發，Vite dev server）：
+
+```powershell
+cd ui
+npm ci
+npm run dev -- --host 0.0.0.0
+```
+
+若想快速以 docker-compose 啟動（預設為開發模式，UI 使用 Vite dev server）：
+
+```powershell
+docker-compose up --build
+```
+
+備註：docker-compose.yml 預設會使用 `ui/Dockerfile.dev`（啟動 Vite），適合開發但不適合 production。
+
+## 建議的 production 流程
+
+- 前端：使用 `ui/Dockerfile` 進行 multi-stage build（在 build 階段產生 `dist`，production stage 用 nginx 提供靜態檔案）。
+- 後端：使用 `pose_backend/Dockerfile` 建構映像並以非 root user 執行。
+
+## 重要注意事項
+
+- 依賴管理：後端的 `requirements.txt` 與 `pyproject.toml` 都存在，請以單一來源維護依賴（建議在 CI 或部署中使用 `requirements.txt` 或直接使用 `pyproject.toml` + poetry/pep517 流程）。
+- OpenCV：若在無 GUI 的容器中執行，建議使用 `opencv-python-headless`（requirements.txt 已列為 headless）。
+- MediaPipe：啟動時會載入較大的二進位資源，可能耗時且佔用記憶體，建議在部署時注意容器規格（CPU / memory）。
+- 前端發送影格頻率：前端預設每 400ms 發一張影格，若後端回應較慢可能造成請求堆積，建議改為在收到回應後再發下一張（或使用節流機制）。
+
+## 測試
+
+- 前端有一個簡單的測試腳本：
+
+```powershell
+node ui\tests\test_no_video_inputs.js
+```
+
+該腳本會檢查 `ui/tests/no_video_inputs.json` 的 schema 與資料長度（repository 範例會輸出 TEST PASS）。
 
 ## 變更紀錄（Changelog）
 
-- 2025-10-31：新增完整 README，包括專案結構與成果追蹤表格。
+- 2025-11-13：更新 README，修正專案結構與本地 / docker 開發與執行指引。
 
 ---
 
-<!-- AUTO_COMMIT_TRACK_START -->
-
-## 自動提交紀錄（由 workflow 更新）
-
-| 日期 | 提交 | 作者 | 訊息 |
-|------|------|------|------|
-| 2025-10-31T11:55:23+08:00 | [6ca3e12](https://github.com/YeMiao1026/CloudFinalProject/commit/6ca3e12f98de62d919f1d381484ec74084b18dba) | yemiao1026 | Merge branch 'main' of https://github.com/YeMiao1026/CloudFinalProject |
-| 2025-10-31T11:31:59+08:00 | [301b934](https://github.com/YeMiao1026/CloudFinalProject/commit/301b9345e2712cac0590267da6e202df22ed4fd7) | yemiao1026 | update README.md |
-| 2025-10-31T12:34:56Z | [0123456](https://github.com/YeMiao1026/CloudFinalProject/commit/0123456789abcdef0123456789abcdef01234567) | Unit Tester | Test commit from CI simulation |
-<!-- AUTO_COMMIT_TRACK_END -->
-<!-- AUTO_COMMIT_TRACK_END -->
-
-<!-- AUTO_COMMIT_TRACK_END -->
-
-<!-- AUTO_COMMIT_TRACK_END -->
+如果你要我同時把 `README` 翻成英文或加入更完整的部署範例（像是 production docker-compose 或 CI），我可以接著新增。 

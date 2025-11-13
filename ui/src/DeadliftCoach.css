@@ -1,0 +1,150 @@
+/* ======= 整體版面 ======= */
+.squat-coach-app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  font-family: "Noto Sans TC", sans-serif;
+  background-color: #f5f8fb;
+}
+
+/* ======= 標題 ======= */
+.app-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+/* ======= 主內容：左右 50% ======= */
+.main-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 1400px;
+  gap: 1.5rem;
+}
+
+/* ======= 左半邊（影片 + 骨架） ======= */
+.video-wrapper {
+  position: relative;
+  flex: 1;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.live-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.overlay-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ======= 右半邊（儀表板 + 回饋） ======= */
+.right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ======= 儀表板樣式 ======= */
+.analysis-dashboard {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+  padding: 1rem 1.5rem;
+}
+
+.analysis-dashboard h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.8rem;
+}
+
+.dashboard-card {
+  background: #e8f2fc;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.card-title {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.card-value {
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: #1e3a8a;
+}
+
+/* ======= 智慧回饋系統 ======= */
+.feedback-system {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+  padding: 1rem 1.5rem;
+}
+
+.feedback-system h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.feedback-box {
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.feedback-good {
+  background: #d7f3da;
+  border: 2px solid #2e7d32;
+  color: #2e7d32;
+}
+
+.feedback-error {
+  background: #fdecea;
+  border: 2px solid #c62828;
+  color: #c62828;
+}
+
+/* ======= 響應式調整：手機直排 ======= */
+@media (max-width: 900px) {
+  .main-content {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .video-wrapper, .right-panel {
+    width: 100%;
+  }
+
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+}
