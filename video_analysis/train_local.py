@@ -67,9 +67,11 @@ class DeadliftFeatureExtractor:
             min_tracking_confidence=0.3
         )
 
+    # 計算兩點距離
     def dist(self, a, b):
-        return np.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+        return np.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2)
 
+    # 計算三點角度
     def calculate_angle(self, a, b, c):
         a, b, c = np.array(a), np.array(b), np.array(c)
         ba, bc = a - b, c - b
@@ -79,7 +81,6 @@ class DeadliftFeatureExtractor:
     def get_landmarks(self, results):
         if not results.pose_landmarks:
             return None
-
         lm = results.pose_landmarks.landmark
         return {
             'left_ear': [lm[7].x, lm[7].y],
@@ -95,88 +96,80 @@ class DeadliftFeatureExtractor:
             'right_wrist': [lm[16].x, lm[16].y]
         }
 
-    # ======================================
-    # 讀取整部影片，不再使用時間區間
-    # ======================================
+    # ==================================================
+    # [修改重點] 優化後的特徵提取 (正規化 + 完整特徵)
+    # ==================================================
     def extract_features(self, video_path):
         if not os.path.exists(video_path):
             return None, "VideoNotFound"
 
         cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            return None, "VideoOpenFailed"
-
         valid_frames = []
-        total_frames = 0
-        missing_kp = 0
-        valid_count = 0
-
+        
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
 
-            total_frames += 1
-
+            # 影像處理
             try:
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                results = self.pose.process(rgb)
             except:
-                return None, "FrameDecodeError"
-
-            results = self.pose.process(rgb)
-
-            if not results.pose_landmarks:
                 continue
 
             lm = self.get_landmarks(results)
-            if lm is None:
-                missing_kp += 1
+            if not lm:
                 continue
 
-            valid_count += 1
-
+            # 1. 計算中心點 (左右平均，增加穩定性)
             shoulder_c = np.mean([lm['left_shoulder'], lm['right_shoulder']], axis=0)
             hip_c = np.mean([lm['left_hip'], lm['right_hip']], axis=0)
             knee_c = np.mean([lm['left_knee'], lm['right_knee']], axis=0)
             ankle_c = np.mean([lm['left_ankle'], lm['right_ankle']], axis=0)
             wrist_c = np.mean([lm['left_wrist'], lm['right_wrist']], axis=0)
 
+            # 2. [關鍵] 計算「軀幹長度」作為比例尺
+            torso_len = self.dist(shoulder_c, hip_c)
+            if torso_len == 0: torso_len = 1.0 # 避免除以 0
+
+            # 3. 角度計算 (這部分保持不變)
+            # spine_angle (耳-肩-髖): 這是最容易被"低頭"誤導的數值
             spine_angle = self.calculate_angle(lm['left_ear'], shoulder_c, hip_c)
             hip_angle = self.calculate_angle(shoulder_c, hip_c, knee_c)
             knee_angle = self.calculate_angle(hip_c, knee_c, ankle_c)
+            # torso_angle (軀幹前傾角): 幫助模型判斷身體現在是站直還是彎腰
             torso_angle = self.calculate_angle([hip_c[0], hip_c[1] - 0.5], hip_c, shoulder_c)
 
-            head_shoulder_dist = self.dist(lm['left_ear'], shoulder_c)
-            shoulder_hip_dist = self.dist(shoulder_c, hip_c)
+            # 4. [修改] 距離特徵 -> 改為「比例 (Ratio)」
+            # 原本是絕對距離，現在除以 torso_len，變成相對比例
+            head_shoulder_ratio = self.dist(lm['left_ear'], shoulder_c) / torso_len
+            
+            # 5. [修改] 向量特徵 -> 也要除以 torso_len
+            # 這樣不管人站遠站近，向量的大小都會一致
+            vec_sh_hip = (shoulder_c - hip_c) / torso_len
+            vec_hip_knee = (hip_c - knee_c) / torso_len
+            vec_ear_sh = (lm['left_ear'] - shoulder_c) / torso_len
+            vec_wrist_ankle = (wrist_c - ankle_c) / torso_len
 
-            vec_sh_hip = shoulder_c - hip_c
-            vec_hip_knee = hip_c - knee_c
-            vec_ear_sh = lm['left_ear'] - shoulder_c
-            vec_wrist_ankle = wrist_c - ankle_c
-
+            # 組合特徵 (順序必須固定)
             features = [
                 spine_angle, hip_angle, knee_angle, torso_angle,
-                head_shoulder_dist, shoulder_hip_dist,
+                head_shoulder_ratio, # 這裡原本是 dist，現在是 ratio，數值意義變了，必須重新訓練模型
+                0.0, # 佔位符: 原本是 shoulder_hip_dist，但因為除以自己=1，無意義，填 0 即可
                 vec_sh_hip[0], vec_sh_hip[1],
                 vec_hip_knee[0], vec_hip_knee[1],
                 vec_ear_sh[0], vec_ear_sh[1],
                 vec_wrist_ankle[0], vec_wrist_ankle[1]
             ]
-
             valid_frames.append(features)
 
         cap.release()
 
-        if total_frames == 0:
-            return None, "NoFrames"
+        if not valid_frames:
+            return None, "NoFeatures"
 
-        if valid_count == 0:
-            return None, "NoPoseDetected"
-
-        success_ratio = valid_count / total_frames
-        if success_ratio < MIN_SUCCESS_RATIO:
-            return None, f"LowSuccessRatio({success_ratio:.2f})"
-
+        # 聚合整部影片的數據
         data = np.array(valid_frames)
         return np.concatenate([
             np.mean(data, axis=0),
