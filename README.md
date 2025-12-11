@@ -101,6 +101,8 @@ node ui\tests\test_no_video_inputs.js
 
 | 日期 | 提交 | 作者 | 訊息 |
 |------|------|------|------|
+| 2025-12-11T20:49:54+08:00 | [257e526](https://github.com/YeMiao1026/CloudFinalProject/commit/257e5269c6ab37e86ae28150b91205982ad6dd96) | C0ding_fArmer | Add files via upload |
 | 2025-11-13T10:01:08+08:00 | [e856d9f](https://github.com/YeMiao1026/CloudFinalProject/commit/e856d9fb8c45ee5350c293729405214ff24d632c) | YeMiao1026 | Merge pull request #1 from YeMiao1026/Classroom-demonstration |
+<!-- AUTO_COMMIT_TRACK_END -->
 
 <!-- AUTO_COMMIT_TRACK_END -->
