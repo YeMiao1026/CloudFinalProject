@@ -104,3 +104,49 @@ node ui\tests\test_no_video_inputs.js
 | 2025-11-13T10:01:08+08:00 | [e856d9f](https://github.com/YeMiao1026/CloudFinalProject/commit/e856d9fb8c45ee5350c293729405214ff24d632c) | YeMiao1026 | Merge pull request #1 from YeMiao1026/Classroom-demonstration |
 
 <!-- AUTO_COMMIT_TRACK_END -->
+
+---
+
+## 2025-12-11 專案更新說明 (Project Update)
+
+### 1. 前後端 API 互動機制
+目前系統採用 **Client-Side Computing + Server-Side Analysis** 架構：
+- **前端 (Frontend)**：
+  - 使用 React + Vite 建構。
+  - 整合 **Mediapipe Pose** (Local WASM) 進行即時人體關鍵點偵測 (33 Keypoints)。
+  - 計算即時角度（膝蓋、髖部、背部）並繪製骨架於 Canvas。
+  - 將關鍵點座標封裝為 JSON，透過 HTTP POST 發送至後端。
+- **後端 (Backend - `video_analysis`)**：
+  - 使用 FastAPI 接收數據。
+  - 採用 **Sliding Window (30 frames)** 機制累積數據。
+  - 使用 Random Forest 模型進行動作分類。
+  - 回傳分析結果（如：「背部彎曲」、「正確動作」）。
+
+### 2. 本地啟動方式 (Updated Local Startup)
+
+**後端 (Backend)**
+請使用 `video_analysis` 目錄下的 API Server（注意：非 `pose_backend`）：
+```bash
+cd video_analysis
+# 確保已安裝依賴 (pip install -r ../requirements.txt 或手動安裝 fastapi uvicorn scikit-learn joblib numpy)
+uvicorn api_server:app --reload --host 0.0.0.0 --port 8000
+```
+
+**前端 (Frontend)**
+```bash
+cd ui
+npm install
+npm run dev
+```
+
+### 3. 前端達成功能 (Frontend Achievements)
+本階段前端已成功完成以下核心功能：
+1.  **Mediapipe 本地化整合**：解決 CDN 版本衝突與 WASM 載入錯誤，成功在 React 環境中運行 Pose 模型。
+2.  **即時骨架視覺化**：實作 Canvas 繪圖邏輯，包含關鍵點、骨架連線及特定部位（如背部）的輔助線與角度數值顯示。
+3.  **API 串接與並發控制**：
+    - 實作 `fetch` 機制傳送座標至後端。
+    - 加入 `isFetching` 鎖與頻率限制 (Throttle)，防止請求堆積導致的 UI 延遲或卡頓。
+4.  **錯誤處理與回饋顯示**：
+    - 處理後端回傳的狀態碼與錯誤訊息（如：資料不足、模型冷啟動）。
+    - 根據分析結果動態改變 UI 狀態（如：警告文字顏色變化）。
+5.  **數據一致性修正**：協助除錯並確認前後端座標維度（2D/3D）差異，確保模型輸入數據的正確性。

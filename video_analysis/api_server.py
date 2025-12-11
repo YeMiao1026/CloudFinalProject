@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import numpy as np
@@ -10,12 +11,21 @@ from collections import deque
 # =====================================
 clf = joblib.load("deadlift_rf_model.pkl")
 mlb = joblib.load("label_binarizer.pkl")
-
 # =====================================
 # 定義 FastAPI
 # =====================================
 app = FastAPI(title="Deadlift Posture Analysis API")
 
+# 設定 CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 每位使用者（以 session_id 區隔）擁有自己的 frame window
 # 每位使用者（以 session_id 區隔）擁有自己的 frame window
 user_windows = {}
 
@@ -60,6 +70,7 @@ class DeadliftFeatureExtractor:
         spine_angle = self.calculate_angle(lm['left_ear'], shoulder_c, hip_c)
         hip_angle = self.calculate_angle(shoulder_c, hip_c, knee_c)
         knee_angle = self.calculate_angle(hip_c, knee_c, ankle_c)
+        # 修正：確保輸入維度一致 (2D)，與訓練時保持一致
         torso_angle = self.calculate_angle([hip_c[0], hip_c[1]-0.5], hip_c, shoulder_c)
 
         head_shoulder_ratio = self.dist(lm['left_ear'], shoulder_c) / torso_len
@@ -109,7 +120,7 @@ def predict(data: FrameData):
             key: np.array([
                 data.landmarks[idx].x,
                 data.landmarks[idx].y,
-                data.landmarks[idx].z,
+                # data.landmarks[idx].z, # 移除 Z 軸，因為訓練時只用了 2D
             ])
             for key, idx in required_idx.items()
         }
