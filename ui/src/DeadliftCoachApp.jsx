@@ -15,7 +15,7 @@ const mpEdges = [
   [24, 26], [26, 28], [28, 32]  // 右腿
 ]
 
-export default function DeadliftCoachApp() {
+export default function DeadliftCoachApp({ onBack }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const [angles, setAngles] = useState({ knee: 0, hip: 0, back: 0 })
@@ -234,6 +234,9 @@ if ([LShoulder, RShoulder, LHip, RHip].every(p => p && p.score > 0.5)) {
 
   return (
     <div className="squat-coach-app">
+      <button className="back-button" onClick={onBack}>
+        ← 返回首頁
+      </button>
       <h1 className="app-title">AI 硬舉姿勢分析系統</h1>
       <div className="main-content">
         <div className="video-wrapper">

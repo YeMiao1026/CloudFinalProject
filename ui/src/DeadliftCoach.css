@@ -1,5 +1,6 @@
 /* ======= 整體版面 ======= */
 .squat-coach-app {
+  position: relative; /* For absolute positioning of back button */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -7,6 +8,29 @@
   padding: 1.5rem;
   font-family: "Noto Sans TC", sans-serif;
   background-color: #f5f8fb;
+  min-height: 100vh;
+}
+
+.back-button {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  padding: 0.5rem 1rem;
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  color: #64748b;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.back-button:hover {
+  background-color: #f8fafc;
+  color: #0f172a;
+  border-color: #cbd5e1;
 }
 
 /* ======= 標題 ======= */
