@@ -1,4 +1,4 @@
-FROM python:3.10-slim-bullseye
+FROM python:3.10-slim-bookworm
 
 # Set working directory
 WORKDIR /app
@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Default is 'pose_backend' (when building from repo root). If you build locally with
 # the backend folder as the build context (docker build ./pose_backend), pass
 # --build-arg BACKEND_DIR=. so the Dockerfile will COPY from '.' into /app.
-ARG BACKEND_DIR=pose_backend
+ARG BACKEND_DIR=.
 COPY ${BACKEND_DIR} /app
 
 # Create a virtual environment and install Python dependencies as root so packages

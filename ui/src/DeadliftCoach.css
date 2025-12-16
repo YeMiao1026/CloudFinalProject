@@ -103,7 +103,7 @@
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.8rem;
 }
 
@@ -112,6 +112,18 @@
   border-radius: 8px;
   padding: 1rem;
   text-align: center;
+  transition: all 0.3s ease;
+}
+
+.dashboard-card.card-highlight {
+  background: #fef2f2;
+  border: 2px solid #ef4444;
+  animation: pulse-card 1s ease-in-out infinite;
+}
+
+@keyframes pulse-card {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
 }
 
 .card-title {
@@ -123,6 +135,10 @@
   font-size: 1.6rem;
   font-weight: bold;
   color: #1e3a8a;
+}
+
+.card-highlight .card-value {
+  color: #dc2626;
 }
 
 /* ======= 智慧回饋系統 ======= */
@@ -151,19 +167,199 @@
   color: #2e7d32;
 }
 
+.feedback-warning {
+  background: #fff3cd;
+  border: 2px solid #f59e0b;
+  color: #92400e;
+}
+
 .feedback-error {
   background: #fdecea;
   border: 2px solid #c62828;
   color: #c62828;
 }
 
-/* ======= 響應式調整：手機直排 ======= */
-@media (max-width: 900px) {
-  .main-content {
-    flex-direction: column;
-    align-items: center;
-  }
+.feedback-critical {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  border: 3px solid #7f1d1d;
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 700;
+  padding: 1.2rem;
+  animation: pulse-warning 0.8s ease-in-out infinite;
+}
 
+@keyframes pulse-warning {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+  50% { transform: scale(1.02); box-shadow: 0 0 20px 5px rgba(220, 38, 38, 0.4); }
+}
+
+.warning-icon {
+  margin-right: 0.5rem;
+  font-size: 1.4rem;
+}
+
+/* ======= 動作狀態標籤 ======= */
+.action-status-badge {
+  position: fixed;
+  top: 1.5rem;
+  left: 1.5rem;
+  padding: 0.6rem 1.2rem;
+  border-radius: 2rem;
+  font-weight: 600;
+  font-size: 1rem;
+  z-index: 100;
+  transition: all 0.3s ease;
+}
+
+.action-status-badge.active {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
+}
+
+.action-status-badge.standby {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+/* ======= 全螢幕危險警告 ======= */
+.squat-coach-app.danger-alert {
+  animation: danger-border-flash 0.5s ease-in-out infinite;
+}
+
+@keyframes danger-border-flash {
+  0%, 100% { box-shadow: inset 0 0 0 6px rgba(220, 38, 38, 0.8); }
+  50% { box-shadow: inset 0 0 0 6px rgba(220, 38, 38, 0.2); }
+}
+
+/* ======= 脊椎狀態指示器 ======= */
+.spine-status-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+  padding: 1rem 1.5rem;
+}
+
+.spine-status-container.standby {
+  opacity: 0.7;
+}
+
+.spine-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8rem;
+}
+
+.spine-status-title {
+  font-weight: 600;
+  color: #374151;
+}
+
+.spine-status-label {
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.spine-status-label.status-safe {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.spine-status-label.status-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.spine-status-label.status-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.spine-status-label.status-critical {
+  background: #dc2626;
+  color: white;
+  animation: blink 0.5s ease-in-out infinite;
+}
+
+.spine-status-label.status-monitoring {
+  background: #3b82f6;
+  color: white;
+}
+
+.spine-status-label.status-standby {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.spine-status-bar {
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.spine-status-progress {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.spine-status-progress.status-safe {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+}
+
+.spine-status-progress.status-monitoring {
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+}
+
+.spine-status-progress.status-warning {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.spine-status-progress.status-danger {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.spine-status-progress.status-critical {
+  background: linear-gradient(90deg, #dc2626, #991b1b);
+  animation: progress-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes progress-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* 穩定計數資訊 */
+.spine-stability-info {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: #64748b;
+  text-align: right;
+}
+
+/* 卡片副標題 */
+.card-subtext {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* 監測中回饋樣式 */
+.feedback-monitoring {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #1e40af;
+  border-left: 4px solid #3b82f6;
   .video-wrapper, .right-panel {
     width: 100%;
   }
