@@ -4,7 +4,7 @@
 static_sites:
   - name: cloudfinal-ui
     repo: https://github.com/YeMiao1026/CloudFinalProject
-    branch: Classroom-demonstration
+    branch: main
     # rootDir points to the folder containing package.json
     rootDir: ui
     buildCommand: npm install && npm run build
@@ -18,7 +18,7 @@ services:
     name: cloudfinal-backend
     env: docker
     repo: https://github.com/YeMiao1026/CloudFinalProject
-    branch: Classroom-demonstration
+    branch: main
     dockerfilePath: pose_backend/Dockerfile
     dockerContext: pose_backend
     # plan: free
