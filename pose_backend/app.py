@@ -2,12 +2,16 @@ from fastapi import FastAPI
 from fastapi.requests import Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from typing import List, Optional
 import numpy as np
 from io import BytesIO
 from PIL import Image
 import mediapipe as mp
+import os
+from collections import deque
 
-app = FastAPI(title="Pose Detection API (Back Angle with Spine Offset)")
+app = FastAPI(title="Pose Detection API (Back Angle with Spine Offset + ML Prediction)")
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,6 +24,111 @@ app.add_middleware(
 mp_pose = mp.solutions.pose
 # lazy initialize MediaPipe Pose to avoid loading binary resources at import time
 pose = None
+
+# =====================================
+# 🤖 ML 模型載入（延遲載入）
+# =====================================
+clf = None
+mlb = None
+ML_MODEL_LOADED = False
+
+def init_ml_model():
+    """延遲載入 ML 模型"""
+    global clf, mlb, ML_MODEL_LOADED
+    if ML_MODEL_LOADED:
+        return True
+    
+    try:
+        import joblib
+        # 嘗試多個可能的路徑
+        possible_paths = [
+            "deadlift_rf_model.pkl",  # 同目錄
+            "../video_analysis/deadlift_rf_model.pkl",  # 相對路徑
+            "/app/video_analysis/deadlift_rf_model.pkl",  # Docker 路徑
+            os.path.join(os.path.dirname(__file__), "deadlift_rf_model.pkl"),
+        ]
+        
+        model_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                model_path = path
+                break
+        
+        if model_path is None:
+            print("⚠️ ML model not found, /predict will be unavailable")
+            return False
+        
+        clf = joblib.load(model_path)
+        mlb = joblib.load(model_path.replace("deadlift_rf_model.pkl", "label_binarizer.pkl"))
+        ML_MODEL_LOADED = True
+        print(f"✅ ML model loaded from {model_path}")
+        return True
+    except Exception as e:
+        print(f"⚠️ Failed to load ML model: {e}")
+        return False
+
+# 每位使用者的 frame window
+user_windows = {}
+
+# =====================================
+# 輸入格式（前端 Mediapipe 33 個 landmarks）
+# =====================================
+class Landmark(BaseModel):
+    x: float
+    y: float
+    z: float
+    visibility: Optional[float] = 1.0
+
+class FrameData(BaseModel):
+    session_id: str
+    landmarks: List[Landmark]
+
+# =====================================
+# ML 特徵萃取器
+# =====================================
+class DeadliftFeatureExtractor:
+    def dist(self, a, b):
+        return np.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+
+    def calculate_angle(self, a, b, c):
+        a, b, c = np.array(a), np.array(b), np.array(c)
+        ba, bc = a - b, c - b
+        cos_angle = np.dot(ba, bc) / ((np.linalg.norm(ba)*np.linalg.norm(bc)) + 1e-7)
+        return np.degrees(np.arccos(np.clip(cos_angle, -1.0, 1.0)))
+
+    def extract_frame_features(self, lm):
+        shoulder_c = np.mean([lm['left_shoulder'], lm['right_shoulder']], axis=0)
+        hip_c = np.mean([lm['left_hip'], lm['right_hip']], axis=0)
+        knee_c = np.mean([lm['left_knee'], lm['right_knee']], axis=0)
+        ankle_c = np.mean([lm['left_ankle'], lm['right_ankle']], axis=0)
+        wrist_c = np.mean([lm['left_wrist'], lm['right_wrist']], axis=0)
+
+        torso_len = self.dist(shoulder_c, hip_c)
+        if torso_len == 0: torso_len = 1.0
+
+        spine_angle = self.calculate_angle(lm['left_ear'], shoulder_c, hip_c)
+        hip_angle = self.calculate_angle(shoulder_c, hip_c, knee_c)
+        knee_angle = self.calculate_angle(hip_c, knee_c, ankle_c)
+        torso_angle = self.calculate_angle([hip_c[0], hip_c[1]-0.5], hip_c, shoulder_c)
+
+        head_shoulder_ratio = self.dist(lm['left_ear'], shoulder_c) / torso_len
+
+        vec_sh_hip = (shoulder_c - hip_c) / torso_len
+        vec_hip_knee = (hip_c - knee_c) / torso_len
+        vec_ear_sh = (lm['left_ear'] - shoulder_c) / torso_len
+        vec_wrist_ankle = (wrist_c - ankle_c) / torso_len
+
+        return [
+            spine_angle, hip_angle, knee_angle, torso_angle,
+            head_shoulder_ratio,
+            0.0,
+            vec_sh_hip[0], vec_sh_hip[1],
+            vec_hip_knee[0], vec_hip_knee[1],
+            vec_ear_sh[0], vec_ear_sh[1],
+            vec_wrist_ankle[0], vec_wrist_ankle[1]
+        ]
+
+extractor = DeadliftFeatureExtractor()
 
 
 def init_pose():
@@ -168,3 +277,79 @@ else:
     @app.post("/api/pose")
     async def detect_pose_unavailable(request: Request):
         return _build_error_response("python-multipart is not installed. Install with: pip install python-multipart")
+
+
+# ================================================================
+# 🤖 ML 預測端點：30 幀滑動窗口 + Random Forest 分類
+# ================================================================
+@app.post("/predict")
+def predict(data: FrameData):
+    """
+    接收前端 MediaPipe 33 landmarks，累積 30 幀後進行 ML 推論
+    回傳格式：
+    - A: 偵測到的姿勢問題標籤列表
+    - D: 是否成功
+    - E: 錯誤訊息（如有）
+    """
+    # 嘗試載入 ML 模型
+    if not init_ml_model():
+        return {"A": [], "D": False, "E": "MLModelNotLoaded"}
+    
+    session = data.session_id
+
+    # 初始化 window
+    if session not in user_windows:
+        user_windows[session] = deque(maxlen=30)
+
+    # Mediapipe 33 landmark → 取出所需 index
+    required_idx = {
+        "left_ear": 7,
+        "left_shoulder": 11, "right_shoulder": 12,
+        "left_hip": 23, "right_hip": 24,
+        "left_knee": 25, "right_knee": 26,
+        "left_ankle": 27, "right_ankle": 28,
+        "left_wrist": 15, "right_wrist": 16
+    }
+
+    try:
+        lm = {
+            key: np.array([
+                data.landmarks[idx].x,
+                data.landmarks[idx].y,
+            ])
+            for key, idx in required_idx.items()
+        }
+    except Exception:
+        return {"A": [], "D": False, "E": "LandmarkMissing"}
+
+    # 抽取單一 frame 特徵
+    feats = extractor.extract_frame_features(lm)
+    user_windows[session].append(feats)
+
+    # 如果未滿 30 幀 → 無法預測
+    if len(user_windows[session]) < 30:
+        return {"A": [], "D": True, "E": "InsufficientFrames"}
+
+    # ========================
+    # 聚合特徵（與訓練一致）
+    # ========================
+    window = np.array(user_windows[session])
+    input_vec = np.concatenate([
+        np.mean(window, axis=0),
+        np.max(window, axis=0),
+        np.min(window, axis=0),
+        np.std(window, axis=0)
+    ]).reshape(1, -1)
+
+    # 模型推論
+    pred = clf.predict(input_vec)
+    labels = mlb.inverse_transform(pred)[0]
+
+    # ------------------------
+    # 回傳 A / D / E
+    # ------------------------
+    return {
+        "A": list(labels),
+        "D": True,
+        "E": None
+    }

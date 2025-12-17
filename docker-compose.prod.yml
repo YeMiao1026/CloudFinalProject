@@ -1,19 +1,14 @@
+# Production Docker Compose - 使用 nginx 提供前端靜態檔案
 services:
   ui:
     build:
       context: ./ui
-      # use the dev Dockerfile so the container runs Vite (dev server)
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     ports:
-      - "5173:5173"
+      - "80:80"
     restart: unless-stopped
-    volumes:
-      - ./ui:/app:cached
-      - /app/node_modules
     environment:
-      - CHOKIDAR_USEPOLLING=true
       - VITE_API_BASE=http://localhost:8000
-    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
     depends_on:
       - backend
 
@@ -28,8 +23,8 @@ services:
       - PYTHONUNBUFFERED=1
       - PORT=8000
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/ping"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/ping')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
