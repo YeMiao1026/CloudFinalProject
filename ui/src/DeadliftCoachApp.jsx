@@ -32,6 +32,24 @@ const DEADLIFT_DETECTION = {
   hipAngleThreshold: 160,  // 髖部角度低於此值時認為開始硬舉
 };
 
+// ============================================
+// 🔢 硬舉計數器配置
+// ============================================
+// 動作階段：STANDING(站立) → DESCENDING(下降) → BOTTOM(最低點) → ASCENDING(上升) → STANDING
+// 完成一次循環 = 1 rep
+const REP_COUNTER_CONFIG = {
+  // 髖部角度閾值（用於判斷動作階段）
+  standingAngle: 165,      // 高於此角度認為站立
+  bottomAngle: 120,        // 低於此角度認為到達最低點
+  
+  // 防抖動配置
+  minRepDuration: 800,     // 最短單次動作時間（毫秒），防止誤判
+  stableFrames: 5,         // 需連續 N 幀確認狀態改變
+  
+  // 自動組數配置
+  restTimeThreshold: 10000, // 休息超過此時間（毫秒）自動開始新組
+};
+
 const mpEdges = [
   [11, 13], [13, 15],       // 左臂
   [12, 14], [14, 16],       // 右臂
@@ -60,6 +78,23 @@ export default function DeadliftCoachApp({ onBack }) {
   const warningFrameCount = useRef(0);
   const dangerFrameCount = useRef(0);
   const smoothedAngle = useRef(0);  // 平滑後的角度
+  
+  // ============================================
+  // 🔢 硬舉計數器狀態
+  // ============================================
+  const [repCount, setRepCount] = useState(0);           // 當前組次數
+  const [setCount, setSetCount] = useState(1);           // 組數
+  const [totalReps, setTotalReps] = useState(0);         // 總次數
+  const [repPhase, setRepPhase] = useState('STANDING');  // 動作階段
+  const [bestReps, setBestReps] = useState(0);           // 最佳組次數
+  
+  // 計數器內部 refs
+  const lastRepTime = useRef(Date.now());                // 上次完成 rep 的時間
+  const lastActivityTime = useRef(Date.now());           // 上次偵測到動作的時間
+  const phaseStableFrames = useRef(0);                   // 階段穩定幀數
+  const currentPhase = useRef('STANDING');               // 當前階段（ref 版本）
+  const repHistory = useRef([]);                         // 每組次數歷史
+  const smoothedHipAngle = useRef(180);                  // 平滑後的髖部角度
 
   // ============================================
   // 🔊 播放警告音效
@@ -216,6 +251,140 @@ export default function DeadliftCoachApp({ onBack }) {
     };
   }, []);
 
+  // ============================================
+  // 🔢 硬舉計數器邏輯
+  // ============================================
+  const updateRepCounter = useCallback((hipAngle) => {
+    const now = Date.now();
+    
+    // 髖部角度平滑處理
+    const α = 0.3;
+    smoothedHipAngle.current = α * hipAngle + (1 - α) * smoothedHipAngle.current;
+    const smoothHip = smoothedHipAngle.current;
+    
+    // 判斷目標階段
+    let targetPhase = currentPhase.current;
+    
+    if (smoothHip >= REP_COUNTER_CONFIG.standingAngle) {
+      targetPhase = 'STANDING';
+    } else if (smoothHip <= REP_COUNTER_CONFIG.bottomAngle) {
+      targetPhase = 'BOTTOM';
+    } else if (currentPhase.current === 'STANDING' && smoothHip < REP_COUNTER_CONFIG.standingAngle) {
+      targetPhase = 'DESCENDING';
+    } else if (currentPhase.current === 'BOTTOM' && smoothHip > REP_COUNTER_CONFIG.bottomAngle) {
+      targetPhase = 'ASCENDING';
+    }
+    
+    // 穩定幀數確認
+    if (targetPhase !== currentPhase.current) {
+      phaseStableFrames.current++;
+      
+      if (phaseStableFrames.current >= REP_COUNTER_CONFIG.stableFrames) {
+        const prevPhase = currentPhase.current;
+        currentPhase.current = targetPhase;
+        phaseStableFrames.current = 0;
+        
+        // 🎯 計數邏輯：從 ASCENDING 回到 STANDING = 完成一次
+        if (prevPhase === 'ASCENDING' && targetPhase === 'STANDING') {
+          const timeSinceLastRep = now - lastRepTime.current;
+          
+          // 防抖動：檢查最短動作時間
+          if (timeSinceLastRep >= REP_COUNTER_CONFIG.minRepDuration) {
+            lastRepTime.current = now;
+            
+            setRepCount(prev => {
+              const newCount = prev + 1;
+              // 更新最佳記錄
+              setBestReps(best => Math.max(best, newCount));
+              return newCount;
+            });
+            setTotalReps(prev => prev + 1);
+            
+            // 播放成功音效
+            playSuccessSound();
+          }
+        }
+        
+        setRepPhase(targetPhase);
+        lastActivityTime.current = now;
+      }
+    } else {
+      phaseStableFrames.current = 0;
+    }
+    
+    // 自動檢測組間休息（長時間站立 = 新組）
+    if (currentPhase.current === 'STANDING' && repCount > 0) {
+      const restTime = now - lastActivityTime.current;
+      if (restTime > REP_COUNTER_CONFIG.restTimeThreshold) {
+        // 記錄前一組
+        repHistory.current.push(repCount);
+        setSetCount(prev => prev + 1);
+        setRepCount(0);
+        lastActivityTime.current = now;
+      }
+    }
+    
+    return {
+      phase: currentPhase.current,
+      smoothedAngle: smoothHip,
+      isActive: currentPhase.current !== 'STANDING'
+    };
+  }, [repCount]);
+
+  // ============================================
+  // 🔊 播放成功音效（完成一次動作）
+  // ============================================
+  const playSuccessSound = useCallback(() => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const ctx = audioContextRef.current;
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      oscillator.frequency.value = 523.25; // C5 音符
+      oscillator.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      
+      oscillator.start(ctx.currentTime);
+      oscillator.stop(ctx.currentTime + 0.15);
+    } catch (e) {
+      console.warn('Audio not supported:', e);
+    }
+  }, []);
+
+  // ============================================
+  // 🔄 重置計數器
+  // ============================================
+  const resetCounter = useCallback(() => {
+    setRepCount(0);
+    setSetCount(1);
+    setTotalReps(0);
+    setBestReps(0);
+    setRepPhase('STANDING');
+    repHistory.current = [];
+    lastRepTime.current = Date.now();
+    lastActivityTime.current = Date.now();
+    currentPhase.current = 'STANDING';
+  }, []);
+
+  // ============================================
+  // ➕ 手動開始新組
+  // ============================================
+  const startNewSet = useCallback(() => {
+    if (repCount > 0) {
+      repHistory.current.push(repCount);
+    }
+    setSetCount(prev => prev + 1);
+    setRepCount(0);
+    lastActivityTime.current = Date.now();
+  }, [repCount]);
+
   // Mediapipe Pose 初始化與相機設定
   useEffect(() => {
     const pose = new window.Pose({
@@ -290,6 +459,9 @@ export default function DeadliftCoachApp({ onBack }) {
     
     // 4. 🏥 運動醫學級圓背偵測（含時間穩定機制）
     const spineResult = detectRoundedBack(landmarks, isLifting);
+    
+    // 4.5 🔢 更新硬舉計數器
+    const counterResult = updateRepCounter(hipAngle);
     
     // 5. 更新角度狀態
     const newAngles = {
@@ -517,6 +689,19 @@ export default function DeadliftCoachApp({ onBack }) {
         {isDoingDeadlift ? '🏋️ 硬舉中' : '🧍 準備中'}
       </div>
       
+      {/* 🔢 大型計數器顯示（視頻左上角） */}
+      <div className="rep-counter-overlay">
+        <div className="rep-count-big">{repCount}</div>
+        <div className="rep-count-label">REPS</div>
+        <div className="phase-indicator">
+          <span className={`phase-dot ${repPhase.toLowerCase()}`}></span>
+          {repPhase === 'STANDING' && '站立'}
+          {repPhase === 'DESCENDING' && '下降中'}
+          {repPhase === 'BOTTOM' && '最低點'}
+          {repPhase === 'ASCENDING' && '上升中'}
+        </div>
+      </div>
+      
       <div className="main-content">
         <div className="video-wrapper">
           <video ref={videoRef} className="live-video" autoPlay muted playsInline />
@@ -540,6 +725,17 @@ export default function DeadliftCoachApp({ onBack }) {
           
           {/* 脊椎狀態指示器 */}
           <SpineStatusIndicator status={spineStatus} isActive={isDoingDeadlift} />
+          
+          {/* 🔢 詳細計數器面板 */}
+          <RepCounter 
+            repCount={repCount}
+            setCount={setCount}
+            totalReps={totalReps}
+            bestReps={bestReps}
+            repPhase={repPhase}
+            onReset={resetCounter}
+            onNewSet={startNewSet}
+          />
           
           <div className="feedback-system">
             <h3>智慧回饋系統</h3>
@@ -630,6 +826,66 @@ const SpineStatusIndicator = ({ status, isActive }) => {
           <span>穩定計數: {status.warningFrames || 0}/{STABILITY_CONFIG.frameThreshold}</span>
         </div>
       )}
+    </div>
+  );
+};
+
+// ============================================
+// 🔢 組件：硬舉計數器
+// ============================================
+const RepCounter = ({ repCount, setCount, totalReps, bestReps, repPhase, onReset, onNewSet }) => {
+  const getPhaseInfo = () => {
+    switch (repPhase) {
+      case 'STANDING': return { icon: '🧍', text: '站立準備', color: '#4CAF50' };
+      case 'DESCENDING': return { icon: '⬇️', text: '下降階段', color: '#FF9800' };
+      case 'BOTTOM': return { icon: '⏬', text: '最低位置', color: '#2196F3' };
+      case 'ASCENDING': return { icon: '⬆️', text: '上升階段', color: '#9C27B0' };
+      default: return { icon: '🔄', text: '偵測中', color: '#757575' };
+    }
+  };
+  
+  const phaseInfo = getPhaseInfo();
+
+  return (
+    <div className="rep-counter-container">
+      <div className="rep-counter-header">
+        <span className="rep-counter-title">🔢 硬舉計數器</span>
+        <div className="rep-counter-actions">
+          <button className="counter-btn new-set-btn" onClick={onNewSet} title="開始新組">
+            ➕ 新組
+          </button>
+          <button className="counter-btn reset-btn" onClick={onReset} title="重置所有">
+            🔄
+          </button>
+        </div>
+      </div>
+      
+      <div className="rep-counter-main">
+        <div className="current-rep">
+          <div className="rep-number">{repCount}</div>
+          <div className="rep-label">當前組次數</div>
+        </div>
+        
+        <div className="rep-stats">
+          <div className="stat-item">
+            <span className="stat-value">{setCount}</span>
+            <span className="stat-label">組數</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-value">{totalReps}</span>
+            <span className="stat-label">總次數</span>
+          </div>
+          <div className="stat-item best">
+            <span className="stat-value">{bestReps}</span>
+            <span className="stat-label">最佳</span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="phase-status" style={{ borderColor: phaseInfo.color }}>
+        <span className="phase-icon">{phaseInfo.icon}</span>
+        <span className="phase-text" style={{ color: phaseInfo.color }}>{phaseInfo.text}</span>
+      </div>
     </div>
   );
 };

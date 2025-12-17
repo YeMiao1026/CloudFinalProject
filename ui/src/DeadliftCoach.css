@@ -360,6 +360,262 @@
   background: linear-gradient(135deg, #dbeafe, #bfdbfe);
   color: #1e40af;
   border-left: 4px solid #3b82f6;
+}
+
+/* ============================================
+   🔢 硬舉計數器樣式
+   ============================================ */
+
+/* 大型計數器覆蓋層（視頻左上角） */
+.rep-counter-overlay {
+  position: fixed;
+  top: 100px;
+  left: 30px;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 16px;
+  padding: 20px 30px;
+  text-align: center;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.rep-count-big {
+  font-size: 5rem;
+  font-weight: 800;
+  color: #4ADE80;
+  line-height: 1;
+  text-shadow: 0 0 20px rgba(74, 222, 128, 0.5);
+}
+
+.rep-count-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 3px;
+  margin-top: 5px;
+}
+
+.phase-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.phase-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #4ADE80;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.phase-dot.standing {
+  background: #4ADE80;
+}
+
+.phase-dot.descending {
+  background: #FBBF24;
+  animation: pulse 0.5s ease-in-out infinite;
+}
+
+.phase-dot.bottom {
+  background: #60A5FA;
+}
+
+.phase-dot.ascending {
+  background: #A78BFA;
+  animation: pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.2); }
+}
+
+/* 右側面板計數器容器 */
+.rep-counter-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+  padding: 1rem 1.5rem;
+  border: 2px solid #e2e8f0;
+}
+
+.rep-counter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.rep-counter-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.rep-counter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.counter-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.new-set-btn {
+  background: #3b82f6;
+  color: white;
+}
+
+.new-set-btn:hover {
+  background: #2563eb;
+}
+
+.reset-btn {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.reset-btn:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.rep-counter-main {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.current-rep {
+  flex: 1;
+  text-align: center;
+  padding: 1rem;
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border-radius: 12px;
+  border: 2px solid #86efac;
+}
+
+.rep-number {
+  font-size: 3.5rem;
+  font-weight: 800;
+  color: #16a34a;
+  line-height: 1;
+}
+
+.rep-label {
+  font-size: 0.85rem;
+  color: #166534;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.rep-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.stat-item.best {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 1px solid #f59e0b;
+}
+
+.stat-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.stat-item.best .stat-value {
+  color: #b45309;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.stat-item.best .stat-label {
+  color: #92400e;
+}
+
+.phase-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 1rem;
+  padding: 10px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 2px solid #e2e8f0;
+  transition: border-color 0.3s;
+}
+
+.phase-icon {
+  font-size: 1.5rem;
+}
+
+.phase-text {
+  font-size: 1rem;
+  font-weight: 600;
+  transition: color 0.3s;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .rep-counter-overlay {
+    top: 80px;
+    left: 15px;
+    padding: 15px 20px;
+  }
+
+  .rep-count-big {
+    font-size: 3.5rem;
+  }
+
+  .rep-counter-main {
+    flex-direction: column;
+  }
+
+  .rep-stats {
+    flex-direction: row;
+    width: 100%;
+  }
+
+  .stat-item {
+    flex: 1;
+    flex-direction: column;
+    text-align: center;
+    gap: 4px;
+  }
+
   .video-wrapper, .right-panel {
     width: 100%;
   }
