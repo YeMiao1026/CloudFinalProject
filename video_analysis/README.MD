@@ -17,22 +17,49 @@ API 支援：
 📁 專案架構
 project/
 │── api_server.py          # FastAPI 主程式
+│── train_local.py         # 本地訓練腳本
 │── deadlift_rf_model.pkl  # 訓練後的模型
 │── label_binarizer.pkl    # MultiLabelBinarizer
-│── requirements.txt
 │── README.md
 
 📦 安裝環境
+
+## 方法一：使用 uv（推薦）
+
+```bash
+# 安裝 uv（如果尚未安裝）
+# Windows: powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+# macOS/Linux: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 在專案根目錄執行
+cd CloudFinalProject
+uv sync
+
+# 執行訓練腳本
+uv run python video_analysis/train_local.py
+
+# 啟動 API Server
+uv run uvicorn video_analysis.api_server:app --reload --host 0.0.0.0 --port 8000
+```
+
+## 方法二：傳統 venv
+
 1️⃣ 建立虛擬環境（建議）
+```bash
 python3.10 -m venv .venv
 .venv\Scripts\activate           # Windows
+source .venv/bin/activate        # macOS/Linux
+```
 
 2️⃣ 安裝套件
+```bash
 pip install -r requirements.txt
-
+```
 
 🚀 啟動 API Server
+```bash
 uvicorn api_server:app --reload --host 0.0.0.0 --port 8000
+```
 
 
 API 將在：

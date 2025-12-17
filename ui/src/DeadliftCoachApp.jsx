@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react"
+﻿import React, { useEffect, useRef, useState, useCallback } from "react"
 import "./DeadliftCoach.css"
 
 const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE) || 'http://127.0.0.1:8000';
@@ -65,6 +65,26 @@ const mpEdges = [
   [24, 26], [26, 28], [28, 32]  // 右腿
 ]
 
+// ============================================
+// 🤖 ML 標籤翻譯對照表（放在頂層方便全局使用）
+// ============================================
+const ML_LABEL_TRANSLATIONS = {
+  // 中文標籤（ML 模型實際返回的）
+  '背部彎曲': '🔴 背部彎曲',
+  '髖提早上升': '⚠️ 髖部過早上升',
+  '啟動姿勢錯誤': '⚠️ 啟動姿勢錯誤',
+  '杠鈴離身體太遠': '⚠️ 槓鈴離身體太遠',
+  '正確動作': '✅ 姿勢正確',
+  '站姿過寬': '⚠️ 站姿過寬',
+  '結尾姿勢不完全': '⚠️ 鎖定不完全',
+  '鎖膝過早': '⚠️ 鎖膝過早',
+  '頭部位置錯誤': '⚠️ 頭部位置錯誤',
+  // 備用英文標籤
+  'rounded_back': '🔴 圓背',
+  'early_hip_drive': '⚠️ 過早伸髖',
+  'good_form': '✅ 姿勢良好',
+};
+
 export default function DeadliftCoachApp({ onBack }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -94,6 +114,192 @@ export default function DeadliftCoachApp({ onBack }) {
   const isFetching = useRef(false);
   const audioContextRef = useRef(null);
   const lastAlertTime = useRef(0);
+  
+  // ============================================
+  // 🔊 語音提示系統
+  // ============================================
+  const [voiceEnabled, setVoiceEnabled] = useState(true);     // 語音開關
+  const [voiceVolume, setVoiceVolume] = useState(1.0);        // 音量 0-1
+  const lastVoiceTime = useRef(0);                            // 上次語音時間
+  const lastVoiceMessage = useRef('');                        // 上次語音內容
+  const speechSynthesis = useRef(window.speechSynthesis);     // 語音合成器
+  
+  // ============================================
+  // 📊 訓練歷史記錄
+  // ============================================
+  const [trainingHistory, setTrainingHistory] = useState([]);  // 歷史紀錄列表
+  const [showHistory, setShowHistory] = useState(false);       // 顯示歷史面板
+  const currentSessionStats = useRef({                         // 當前訓練統計
+    startTime: null,
+    sets: [],
+    totalReps: 0,
+    warnings: { rounded_back: 0, other: 0 },
+    goodFormCount: 0
+  });
+  
+  // ============================================
+  // 🏆 即時姿勢評分系統
+  // ============================================
+  const [currentRepScore, setCurrentRepScore] = useState(100);    // 當前動作分數
+  const [lastRepScore, setLastRepScore] = useState(null);         // 上一下的分數
+  const [avgRepScore, setAvgRepScore] = useState(0);              // 平均分數
+  const [repScores, setRepScores] = useState([]);                 // 所有分數歷史
+  const repScoreFactors = useRef({                                // 當前動作的評分因素
+    spineDeductions: 0,      // 脊椎彎曲扣分
+    depthBonus: 0,           // 深度獎勵
+    speedPenalty: 0,         // 速度過快扣分
+    stabilityBonus: 0,       // 穩定性獎勵
+    warningCount: 0          // 警告次數
+  });
+  
+  // ============================================
+  // ⏱️ 組間休息計時器
+  // ============================================
+  const [restTimer, setRestTimer] = useState({
+    isActive: false,           // 計時器是否啟動
+    timeLeft: 0,               // 剩餘秒數
+    totalTime: 90,             // 總休息時間（預設 90 秒）
+    autoStart: true,           // 自動在完成一組後啟動
+    showTimer: false           // 顯示計時器面板
+  });
+  const restTimerInterval = useRef(null);
+  const lastSetEndTime = useRef(null);
+  
+  // ============================================
+  // 🎯 目標設定系統
+  // ============================================
+  const GOALS_STORAGE_KEY = 'deadlift_training_goals';
+  const ACHIEVEMENTS_STORAGE_KEY = 'deadlift_achievements';
+  
+  const [dailyGoals, setDailyGoals] = useState({
+    targetSets: 5,              // 目標組數
+    targetReps: 25,             // 目標總次數
+    currentSets: 0,             // 今日完成組數
+    currentReps: 0,             // 今日完成次數
+    lastResetDate: null,        // 上次重置日期
+    showGoalPanel: false        // 顯示目標面板
+  });
+  
+  // ============================================
+  // 🏆 成就徽章系統
+  // ============================================
+  const [achievements, setAchievements] = useState({
+    unlocked: [],               // 已解鎖成就 ID 列表
+    newUnlocked: null,          // 新解鎖的成就（用於動畫）
+    showPanel: false,           // 顯示成就面板
+    stats: {                    // 累計統計
+      totalReps: 0,             // 累計總次數
+      totalSets: 0,             // 累計總組數
+      totalSessions: 0,         // 累計訓練次數
+      consecutiveDays: 0,       // 連續訓練天數
+      lastTrainingDate: null,   // 上次訓練日期
+      bestDailyReps: 0,         // 單日最佳次數
+      perfectReps: 0,           // 完美姿勢次數（90分以上）
+      avgScore: 0               // 累計平均分數
+    }
+  });
+  
+  // 成就定義
+  const ACHIEVEMENT_DEFINITIONS = {
+    first_rep: {
+      id: 'first_rep',
+      name: '初試身手',
+      description: '完成第一下硬舉',
+      icon: '🎉',
+      condition: (stats) => stats.totalReps >= 1
+    },
+    rep_10: {
+      id: 'rep_10',
+      name: '熱身完畢',
+      description: '累計完成 10 下硬舉',
+      icon: '💪',
+      condition: (stats) => stats.totalReps >= 10
+    },
+    rep_50: {
+      id: 'rep_50',
+      name: '漸入佳境',
+      description: '累計完成 50 下硬舉',
+      icon: '🔥',
+      condition: (stats) => stats.totalReps >= 50
+    },
+    rep_100: {
+      id: 'rep_100',
+      name: '百發百中',
+      description: '累計完成 100 下硬舉',
+      icon: '💯',
+      condition: (stats) => stats.totalReps >= 100
+    },
+    rep_500: {
+      id: 'rep_500',
+      name: '鐵人精神',
+      description: '累計完成 500 下硬舉',
+      icon: '🏅',
+      condition: (stats) => stats.totalReps >= 500
+    },
+    rep_1000: {
+      id: 'rep_1000',
+      name: '傳奇硬舉者',
+      description: '累計完成 1000 下硬舉',
+      icon: '🏆',
+      condition: (stats) => stats.totalReps >= 1000
+    },
+    streak_3: {
+      id: 'streak_3',
+      name: '三日不懈',
+      description: '連續訓練 3 天',
+      icon: '📆',
+      condition: (stats) => stats.consecutiveDays >= 3
+    },
+    streak_7: {
+      id: 'streak_7',
+      name: '一週堅持',
+      description: '連續訓練 7 天',
+      icon: '🗓️',
+      condition: (stats) => stats.consecutiveDays >= 7
+    },
+    streak_30: {
+      id: 'streak_30',
+      name: '月度達人',
+      description: '連續訓練 30 天',
+      icon: '👑',
+      condition: (stats) => stats.consecutiveDays >= 30
+    },
+    perfect_10: {
+      id: 'perfect_10',
+      name: '完美主義者',
+      description: '累計 10 次完美姿勢（90分以上）',
+      icon: '⭐',
+      condition: (stats) => stats.perfectReps >= 10
+    },
+    perfect_50: {
+      id: 'perfect_50',
+      name: '姿勢大師',
+      description: '累計 50 次完美姿勢（90分以上）',
+      icon: '🌟',
+      condition: (stats) => stats.perfectReps >= 50
+    },
+    daily_goal: {
+      id: 'daily_goal',
+      name: '目標達成',
+      description: '首次完成每日目標',
+      icon: '🎯',
+      condition: (stats, goals) => goals && goals.currentReps >= goals.targetReps
+    },
+    set_master: {
+      id: 'set_master',
+      name: '組數之王',
+      description: '單次訓練完成 10 組',
+      icon: '👊',
+      condition: (stats, goals, sessionStats) => sessionStats && sessionStats.sets >= 10
+    },
+    endurance: {
+      id: 'endurance',
+      name: '耐力戰士',
+      description: '單次訓練完成 50 下',
+      icon: '🦾',
+      condition: (stats, goals, sessionStats) => sessionStats && sessionStats.reps >= 50
+    }
+  };
   
   // 時間穩定機制：追蹤連續超標幀數
   const warningFrameCount = useRef(0);
@@ -160,6 +366,738 @@ export default function DeadliftCoachApp({ onBack }) {
       console.warn('Audio not supported:', e);
     }
   }, []);
+
+  // ============================================
+  // �️ 語音提示播放函式
+  // ============================================
+  const speakMessage = useCallback((message, priority = 'normal') => {
+    if (!voiceEnabled) return;
+    
+    const now = Date.now();
+    // 根據優先級設定最小間隔
+    const minInterval = {
+      'critical': 2000,   // 緊急：2秒間隔
+      'warning': 3000,    // 警告：3秒間隔
+      'normal': 4000,     // 一般：4秒間隔
+      'info': 5000        // 資訊：5秒間隔
+    }[priority] || 4000;
+    
+    // 防止重複播放相同訊息
+    if (message === lastVoiceMessage.current && now - lastVoiceTime.current < minInterval) {
+      return;
+    }
+    
+    // 更新時間和訊息記錄
+    lastVoiceTime.current = now;
+    lastVoiceMessage.current = message;
+    
+    try {
+      // 取消正在播放的語音（高優先級時）
+      if (priority === 'critical') {
+        speechSynthesis.current.cancel();
+      }
+      
+      const utterance = new SpeechSynthesisUtterance(message);
+      utterance.lang = 'zh-TW';  // 繁體中文
+      utterance.rate = 1.1;       // 語速稍快
+      utterance.pitch = 1.0;      // 音調
+      utterance.volume = voiceVolume;
+      
+      // 嘗試使用中文語音
+      const voices = speechSynthesis.current.getVoices();
+      const chineseVoice = voices.find(v => v.lang.includes('zh') || v.lang.includes('TW'));
+      if (chineseVoice) {
+        utterance.voice = chineseVoice;
+      }
+      
+      speechSynthesis.current.speak(utterance);
+    } catch (e) {
+      console.warn('Speech synthesis not supported:', e);
+    }
+  }, [voiceEnabled, voiceVolume]);
+
+  // ============================================
+  // 🔊 姿勢警告語音提示
+  // ============================================
+  const speakPostureWarning = useCallback((status, confirmedStatus) => {
+    if (!voiceEnabled || !isDoingDeadlift) return;
+    
+    // 根據確認狀態播放對應語音
+    if (confirmedStatus === 'critical') {
+      speakMessage('注意！背部嚴重彎曲，請立即停止', 'critical');
+    } else if (confirmedStatus === 'danger') {
+      speakMessage('背部過度彎曲，請挺直背部', 'warning');
+    } else if (status === 'warning') {
+      speakMessage('注意背部姿勢', 'normal');
+    }
+  }, [voiceEnabled, isDoingDeadlift, speakMessage]);
+
+  // ============================================
+  // 🎉 計數語音提示
+  // ============================================
+  const speakRepCount = useCallback((count) => {
+    if (!voiceEnabled) return;
+    speakMessage(`${count}`, 'info');
+  }, [voiceEnabled, speakMessage]);
+
+  // ============================================
+  // 📊 訓練歷史記錄函式
+  // ============================================
+  const HISTORY_STORAGE_KEY = 'deadlift_training_history';
+  
+  // 從 LocalStorage 載入歷史紀錄
+  const loadTrainingHistory = useCallback(() => {
+    try {
+      const saved = localStorage.getItem(HISTORY_STORAGE_KEY);
+      if (saved) {
+        const history = JSON.parse(saved);
+        setTrainingHistory(history);
+        return history;
+      }
+    } catch (e) {
+      console.warn('Failed to load training history:', e);
+    }
+    return [];
+  }, []);
+  
+  // 儲存歷史紀錄到 LocalStorage
+  const saveTrainingHistory = useCallback((history) => {
+    try {
+      const trimmedHistory = history.slice(-50);
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(trimmedHistory));
+      setTrainingHistory(trimmedHistory);
+    } catch (e) {
+      console.warn('Failed to save training history:', e);
+    }
+  }, []);
+  
+  // 開始新的訓練 session
+  const startTrainingSession = useCallback(() => {
+    currentSessionStats.current = {
+      startTime: Date.now(),
+      sets: [],
+      totalReps: 0,
+      warnings: { rounded_back: 0, other: 0 },
+      goodFormCount: 0
+    };
+  }, []);
+  
+  // 記錄一組完成
+  const recordSetComplete = useCallback((reps, setNumber) => {
+    if (currentSessionStats.current.startTime) {
+      currentSessionStats.current.sets.push({
+        setNumber, reps, timestamp: Date.now()
+      });
+      currentSessionStats.current.totalReps += reps;
+    }
+  }, []);
+  
+  // 記錄姿勢警告
+  const recordPostureWarning = useCallback((type) => {
+    if (currentSessionStats.current.startTime) {
+      if (type === 'rounded_back') {
+        currentSessionStats.current.warnings.rounded_back++;
+      } else {
+        currentSessionStats.current.warnings.other++;
+      }
+    }
+  }, []);
+  
+  // 計算姿勢評分 (0-100)
+  const calculateFormScore = (session) => {
+    if (session.totalReps === 0) return 100;
+    const deductions = session.warnings.rounded_back * 5 + session.warnings.other * 2;
+    return Math.max(0, 100 - deductions);
+  };
+  
+  // 結束訓練並儲存
+  const endTrainingSession = useCallback(() => {
+    const session = currentSessionStats.current;
+    if (!session.startTime || session.totalReps === 0) return null;
+    
+    const endTime = Date.now();
+    const duration = Math.round((endTime - session.startTime) / 1000);
+    
+    const record = {
+      id: `session-${session.startTime}`,
+      date: new Date(session.startTime).toISOString(),
+      duration,
+      totalReps: session.totalReps,
+      sets: session.sets.length,
+      setsDetail: session.sets,
+      avgRepsPerSet: session.sets.length > 0 
+        ? Math.round(session.totalReps / session.sets.length * 10) / 10 
+        : 0,
+      warnings: session.warnings,
+      formScore: calculateFormScore(session)
+    };
+    
+    const newHistory = [...trainingHistory, record];
+    saveTrainingHistory(newHistory);
+    
+    currentSessionStats.current = {
+      startTime: null, sets: [], totalReps: 0,
+      warnings: { rounded_back: 0, other: 0 }, goodFormCount: 0
+    };
+    
+    return record;
+  }, [trainingHistory, saveTrainingHistory]);
+  
+  // 刪除歷史紀錄
+  const deleteHistoryRecord = useCallback((recordId) => {
+    const newHistory = trainingHistory.filter(r => r.id !== recordId);
+    saveTrainingHistory(newHistory);
+  }, [trainingHistory, saveTrainingHistory]);
+  
+  // 清除所有歷史
+  const clearAllHistory = useCallback(() => {
+    if (window.confirm('確定要清除所有訓練紀錄嗎？')) {
+      localStorage.removeItem(HISTORY_STORAGE_KEY);
+      setTrainingHistory([]);
+    }
+  }, []);
+  
+  // 元件載入時讀取歷史紀錄
+  useEffect(() => {
+    loadTrainingHistory();
+    startTrainingSession();
+  }, []);
+
+  // ============================================
+  // ⏱️ 休息計時器函式
+  // ============================================
+  
+  // 開始休息計時
+  const startRestTimer = useCallback((duration = null) => {
+    // 清除現有計時器
+    if (restTimerInterval.current) {
+      clearInterval(restTimerInterval.current);
+    }
+    
+    const restDuration = duration || restTimer.totalTime;
+    
+    setRestTimer(prev => ({
+      ...prev,
+      isActive: true,
+      timeLeft: restDuration,
+      showTimer: true
+    }));
+    
+    // 開始倒數
+    restTimerInterval.current = setInterval(() => {
+      setRestTimer(prev => {
+        if (prev.timeLeft <= 1) {
+          // 時間到
+          clearInterval(restTimerInterval.current);
+          restTimerInterval.current = null;
+          
+          // 播放提示音
+          playRestEndSound();
+          
+          // 語音提示
+          if (voiceEnabled) {
+            speakMessage('休息結束，準備開始下一組', 'info');
+          }
+          
+          return { ...prev, isActive: false, timeLeft: 0 };
+        }
+        
+        // 剩餘 10 秒時語音提示
+        if (prev.timeLeft === 11 && voiceEnabled) {
+          speakMessage('還有10秒', 'info');
+        }
+        
+        return { ...prev, timeLeft: prev.timeLeft - 1 };
+      });
+    }, 1000);
+  }, [restTimer.totalTime, voiceEnabled, speakMessage]);
+  
+  // 停止休息計時
+  const stopRestTimer = useCallback(() => {
+    if (restTimerInterval.current) {
+      clearInterval(restTimerInterval.current);
+      restTimerInterval.current = null;
+    }
+    setRestTimer(prev => ({ ...prev, isActive: false, timeLeft: 0 }));
+  }, []);
+  
+  // 暫停/繼續休息計時
+  const toggleRestTimer = useCallback(() => {
+    if (restTimer.isActive) {
+      // 暫停
+      if (restTimerInterval.current) {
+        clearInterval(restTimerInterval.current);
+        restTimerInterval.current = null;
+      }
+      setRestTimer(prev => ({ ...prev, isActive: false }));
+    } else if (restTimer.timeLeft > 0) {
+      // 繼續
+      setRestTimer(prev => ({ ...prev, isActive: true }));
+      restTimerInterval.current = setInterval(() => {
+        setRestTimer(prev => {
+          if (prev.timeLeft <= 1) {
+            clearInterval(restTimerInterval.current);
+            restTimerInterval.current = null;
+            playRestEndSound();
+            if (voiceEnabled) {
+              speakMessage('休息結束，準備開始下一組', 'info');
+            }
+            return { ...prev, isActive: false, timeLeft: 0 };
+          }
+          return { ...prev, timeLeft: prev.timeLeft - 1 };
+        });
+      }, 1000);
+    }
+  }, [restTimer.isActive, restTimer.timeLeft, voiceEnabled, speakMessage]);
+  
+  // 設定休息時間
+  const setRestDuration = useCallback((seconds) => {
+    setRestTimer(prev => ({ ...prev, totalTime: seconds }));
+  }, []);
+  
+  // 隱藏計時器面板
+  const hideRestTimer = useCallback(() => {
+    setRestTimer(prev => ({ ...prev, showTimer: false }));
+  }, []);
+  
+  // 播放休息結束音效
+  const playRestEndSound = useCallback(() => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const ctx = audioContextRef.current;
+      
+      // 播放三聲提示音
+      [0, 0.2, 0.4].forEach((delay) => {
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.frequency.value = 880;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, ctx.currentTime + delay);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + delay + 0.15);
+        oscillator.start(ctx.currentTime + delay);
+        oscillator.stop(ctx.currentTime + delay + 0.15);
+      });
+    } catch (e) {
+      console.warn('Audio not supported:', e);
+    }
+  }, []);
+  
+  // 清理計時器
+  useEffect(() => {
+    return () => {
+      if (restTimerInterval.current) {
+        clearInterval(restTimerInterval.current);
+      }
+    };
+  }, []);
+
+  // ============================================
+  // 🎯 目標設定系統函式
+  // ============================================
+  
+  // 從 LocalStorage 載入目標設定
+  const loadGoals = useCallback(() => {
+    try {
+      const saved = localStorage.getItem(GOALS_STORAGE_KEY);
+      if (saved) {
+        const goals = JSON.parse(saved);
+        const today = new Date().toDateString();
+        
+        // 檢查是否為新的一天，需要重置進度
+        if (goals.lastResetDate !== today) {
+          goals.currentSets = 0;
+          goals.currentReps = 0;
+          goals.lastResetDate = today;
+          localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(goals));
+        }
+        
+        setDailyGoals(prev => ({ ...prev, ...goals }));
+        return goals;
+      }
+    } catch (e) {
+      console.warn('Failed to load goals:', e);
+    }
+    return null;
+  }, []);
+  
+  // 儲存目標設定到 LocalStorage
+  const saveGoals = useCallback((goals) => {
+    try {
+      const today = new Date().toDateString();
+      const toSave = { ...goals, lastResetDate: today };
+      localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(toSave));
+      setDailyGoals(toSave);
+    } catch (e) {
+      console.warn('Failed to save goals:', e);
+    }
+  }, []);
+  
+  // 更新每日目標
+  const updateDailyGoal = useCallback((targetSets, targetReps) => {
+    saveGoals({ ...dailyGoals, targetSets, targetReps });
+  }, [dailyGoals, saveGoals]);
+  
+  // 記錄完成一下（更新每日進度）
+  const recordRepComplete = useCallback((score) => {
+    setDailyGoals(prev => {
+      const updated = { ...prev, currentReps: prev.currentReps + 1 };
+      saveGoals(updated);
+      return updated;
+    });
+    
+    // 更新成就統計
+    updateAchievementStats('rep', score);
+  }, [saveGoals]);
+  
+  // 記錄完成一組（更新每日進度）
+  const recordSetComplete_Goals = useCallback((reps) => {
+    setDailyGoals(prev => {
+      const updated = { ...prev, currentSets: prev.currentSets + 1 };
+      saveGoals(updated);
+      return updated;
+    });
+  }, [saveGoals]);
+
+  // ============================================
+  // 🏆 成就系統函式
+  // ============================================
+  
+  // 從 LocalStorage 載入成就
+  const loadAchievements = useCallback(() => {
+    try {
+      const saved = localStorage.getItem(ACHIEVEMENTS_STORAGE_KEY);
+      if (saved) {
+        const data = JSON.parse(saved);
+        setAchievements(prev => ({ ...prev, ...data }));
+        return data;
+      }
+    } catch (e) {
+      console.warn('Failed to load achievements:', e);
+    }
+    return null;
+  }, []);
+  
+  // 儲存成就到 LocalStorage
+  const saveAchievements = useCallback((data) => {
+    try {
+      localStorage.setItem(ACHIEVEMENTS_STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.warn('Failed to save achievements:', e);
+    }
+  }, []);
+  
+  // 更新成就統計
+  const updateAchievementStats = useCallback((type, value) => {
+    setAchievements(prev => {
+      const newStats = { ...prev.stats };
+      const today = new Date().toDateString();
+      
+      if (type === 'rep') {
+        newStats.totalReps += 1;
+        
+        // 檢查是否為完美姿勢（90分以上）
+        if (value >= 90) {
+          newStats.perfectReps += 1;
+        }
+        
+        // 更新平均分數
+        if (newStats.totalReps > 0) {
+          newStats.avgScore = Math.round(
+            (newStats.avgScore * (newStats.totalReps - 1) + value) / newStats.totalReps
+          );
+        }
+      } else if (type === 'set') {
+        newStats.totalSets += 1;
+      } else if (type === 'session') {
+        newStats.totalSessions += 1;
+        
+        // 更新連續訓練天數
+        if (newStats.lastTrainingDate) {
+          const lastDate = new Date(newStats.lastTrainingDate);
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          
+          if (lastDate.toDateString() === yesterday.toDateString()) {
+            // 連續訓練
+            newStats.consecutiveDays += 1;
+          } else if (lastDate.toDateString() !== today) {
+            // 中斷了，重置為 1
+            newStats.consecutiveDays = 1;
+          }
+        } else {
+          newStats.consecutiveDays = 1;
+        }
+        
+        newStats.lastTrainingDate = today;
+      } else if (type === 'dailyReps' && value > newStats.bestDailyReps) {
+        newStats.bestDailyReps = value;
+      }
+      
+      const newData = { ...prev, stats: newStats };
+      saveAchievements(newData);
+      return newData;
+    });
+  }, [saveAchievements]);
+  
+  // 檢查並解鎖成就
+  const checkAndUnlockAchievements = useCallback(() => {
+    setAchievements(prev => {
+      const newUnlocked = [...prev.unlocked];
+      let justUnlocked = null;
+      
+      // 檢查每個成就
+      Object.values(ACHIEVEMENT_DEFINITIONS).forEach(achievement => {
+        if (!newUnlocked.includes(achievement.id)) {
+          // 構造當前 session 統計
+          const sessionStats = {
+            sets: setCount,
+            reps: totalReps
+          };
+          
+          if (achievement.condition(prev.stats, dailyGoals, sessionStats)) {
+            newUnlocked.push(achievement.id);
+            justUnlocked = achievement;
+            
+            // 播放成就解鎖音效
+            playAchievementSound();
+            
+            // 語音播報
+            if (voiceEnabled) {
+              speakMessage(`恭喜解鎖成就：${achievement.name}`, 'info');
+            }
+          }
+        }
+      });
+      
+      if (justUnlocked) {
+        const newData = { ...prev, unlocked: newUnlocked, newUnlocked: justUnlocked };
+        saveAchievements(newData);
+        
+        // 3秒後清除新解鎖標記
+        setTimeout(() => {
+          setAchievements(p => ({ ...p, newUnlocked: null }));
+        }, 5000);
+        
+        return newData;
+      }
+      
+      return prev;
+    });
+  }, [dailyGoals, setCount, totalReps, voiceEnabled, speakMessage, saveAchievements]);
+  
+  // 播放成就解鎖音效
+  const playAchievementSound = useCallback(() => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const ctx = audioContextRef.current;
+      
+      // 播放勝利音效（上升音階）
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      notes.forEach((freq, i) => {
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.frequency.value = freq;
+        oscillator.type = 'sine';
+        const startTime = ctx.currentTime + i * 0.15;
+        gainNode.gain.setValueAtTime(0.3, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
+        oscillator.start(startTime);
+        oscillator.stop(startTime + 0.3);
+      });
+    } catch (e) {
+      console.warn('Audio not supported:', e);
+    }
+  }, []);
+  
+  // 播放目標達成音效（慶祝音樂）
+  const playGoalCompleteSound = useCallback(() => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const ctx = audioContextRef.current;
+      
+      // 播放慶祝音效
+      const notes = [392, 523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50];
+      notes.forEach((freq, i) => {
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.frequency.value = freq;
+        oscillator.type = 'triangle';
+        const startTime = ctx.currentTime + i * 0.12;
+        gainNode.gain.setValueAtTime(0.25, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.25);
+        oscillator.start(startTime);
+        oscillator.stop(startTime + 0.25);
+      });
+    } catch (e) {
+      console.warn('Audio not supported:', e);
+    }
+  }, []);
+  
+  // 檢查目標達成
+  const checkGoalComplete = useCallback(() => {
+    if (dailyGoals.currentReps >= dailyGoals.targetReps && 
+        dailyGoals.currentSets >= dailyGoals.targetSets) {
+      // 目標達成！
+      playGoalCompleteSound();
+      if (voiceEnabled) {
+        speakMessage('恭喜！今日目標已達成！', 'info');
+      }
+      return true;
+    }
+    return false;
+  }, [dailyGoals, playGoalCompleteSound, voiceEnabled, speakMessage]);
+  
+  // 元件載入時讀取目標和成就
+  useEffect(() => {
+    loadGoals();
+    loadAchievements();
+  }, []);
+  
+  // 監控目標進度，達成時觸發慶祝
+  useEffect(() => {
+    if (dailyGoals.currentReps > 0) {
+      const wasComplete = dailyGoals.currentReps - 1 < dailyGoals.targetReps;
+      const isComplete = dailyGoals.currentReps >= dailyGoals.targetReps;
+      
+      if (wasComplete && isComplete) {
+        checkGoalComplete();
+        checkAndUnlockAchievements();
+      }
+    }
+  }, [dailyGoals.currentReps]);
+
+  // ============================================
+  // 🏆 即時評分計算函式
+  // ============================================
+  
+  // 更新即時評分（每幀調用）
+  const updateRealtimeScore = useCallback((spineStatus, hipAngle, phase) => {
+    // 只在做動作時計算分數
+    if (phase === 'STANDING') {
+      // 重置評分因素
+      repScoreFactors.current = {
+        spineDeductions: 0,
+        depthBonus: 0,
+        speedPenalty: 0,
+        stabilityBonus: 0,
+        warningCount: 0
+      };
+      setCurrentRepScore(100);
+      return;
+    }
+    
+    let factors = repScoreFactors.current;
+    
+    // 1. 脊椎曲率扣分（即時累積）
+    if (spineStatus.status === 'warning') {
+      factors.spineDeductions += 0.5;  // 每幀扣 0.5 分
+    } else if (spineStatus.status === 'danger' || spineStatus.confirmedStatus === 'danger') {
+      factors.spineDeductions += 2;    // 每幀扣 2 分
+      factors.warningCount++;
+    } else if (spineStatus.confirmedStatus === 'critical') {
+      factors.spineDeductions += 5;    // 每幀扣 5 分
+      factors.warningCount++;
+    }
+    
+    // 2. 深度獎勵（到達低點時）
+    if (phase === 'BOTTOM' && hipAngle < 100) {
+      factors.depthBonus = Math.min(10, factors.depthBonus + 0.5);  // 最多 +10 分
+    }
+    
+    // 計算當前分數
+    let score = 100;
+    score -= Math.min(factors.spineDeductions, 50);  // 脊椎最多扣 50 分
+    score += factors.depthBonus;                      // 深度獎勵
+    score -= factors.speedPenalty;                    // 速度懲罰
+    score += factors.stabilityBonus;                  // 穩定獎勵
+    
+    score = Math.max(0, Math.min(100, Math.round(score)));
+    setCurrentRepScore(score);
+    
+    repScoreFactors.current = factors;
+  }, []);
+  
+  // 完成一個 rep 時計算最終分數
+  const finalizeRepScore = useCallback((duration) => {
+    let factors = repScoreFactors.current;
+    let finalScore = 100;
+    
+    // 1. 脊椎扣分（有上限）
+    finalScore -= Math.min(factors.spineDeductions, 50);
+    
+    // 2. 深度獎勵
+    finalScore += factors.depthBonus;
+    
+    // 3. 動作時間評估（太快扣分，適中加分）
+    if (duration < 1500) {
+      // 太快（< 1.5秒）：扣 5-15 分
+      factors.speedPenalty = Math.round((1500 - duration) / 100);
+      finalScore -= factors.speedPenalty;
+    } else if (duration >= 2000 && duration <= 4000) {
+      // 適中（2-4秒）：獎勵 5 分
+      factors.stabilityBonus = 5;
+      finalScore += 5;
+    }
+    
+    // 4. 無警告獎勵
+    if (factors.warningCount === 0) {
+      finalScore += 5;  // 完美動作獎勵
+    }
+    
+    finalScore = Math.max(0, Math.min(100, Math.round(finalScore)));
+    
+    // 更新分數歷史
+    setRepScores(prev => {
+      const newScores = [...prev, finalScore];
+      // 計算平均分
+      const avg = Math.round(newScores.reduce((a, b) => a + b, 0) / newScores.length);
+      setAvgRepScore(avg);
+      return newScores;
+    });
+    
+    setLastRepScore(finalScore);
+    
+    // 重置因素
+    repScoreFactors.current = {
+      spineDeductions: 0,
+      depthBonus: 0,
+      speedPenalty: 0,
+      stabilityBonus: 0,
+      warningCount: 0
+    };
+    
+    return finalScore;
+  }, []);
+  
+  // 取得分數顏色
+  const getScoreColor = (score) => {
+    if (score >= 90) return '#22c55e';  // 綠色
+    if (score >= 70) return '#f59e0b';  // 黃色
+    if (score >= 50) return '#f97316';  // 橙色
+    return '#ef4444';                    // 紅色
+  };
+  
+  // 取得分數等級
+  const getScoreGrade = (score) => {
+    if (score >= 95) return { grade: 'S', label: '完美！', emoji: '🏆' };
+    if (score >= 90) return { grade: 'A', label: '優秀', emoji: '⭐' };
+    if (score >= 80) return { grade: 'B', label: '良好', emoji: '👍' };
+    if (score >= 70) return { grade: 'C', label: '普通', emoji: '💪' };
+    if (score >= 60) return { grade: 'D', label: '待改進', emoji: '📈' };
+    return { grade: 'F', label: '需注意', emoji: '⚠️' };
+  };
 
   // ============================================
   // 📏 距離/位置檢測函式
@@ -477,6 +1415,10 @@ export default function DeadliftCoachApp({ onBack }) {
           
           // 防抖動：檢查最短動作時間
           if (timeSinceLastRep >= REP_COUNTER_CONFIG.minRepDuration) {
+            // 🏆 計算這一下的最終分數
+            const repScore = finalizeRepScore(timeSinceLastRep);
+            const scoreGrade = getScoreGrade(repScore);
+            
             lastRepTime.current = now;
             
             setRepCount(prev => {
@@ -484,13 +1426,31 @@ export default function DeadliftCoachApp({ onBack }) {
               // 更新最佳記錄
               setBestReps(best => Math.max(best, newCount));
               
-              // 🆕 觸發完成反饋動畫
-              setLastRepFeedback({ count: newCount, time: now });
-              setTimeout(() => setLastRepFeedback(null), 1500);
+              // 🆕 觸發完成反饋動畫（含分數）
+              setLastRepFeedback({ 
+                count: newCount, 
+                time: now,
+                score: repScore,
+                grade: scoreGrade
+              });
+              setTimeout(() => setLastRepFeedback(null), 2000);
+              
+              // 🗣️ 語音播報計數和分數
+              if (repScore >= 90) {
+                speakRepCount(`${newCount}，${scoreGrade.label}`);
+              } else {
+                speakRepCount(`${newCount}`);
+              }
               
               return newCount;
             });
             setTotalReps(prev => prev + 1);
+            
+            // 🎯 更新每日目標進度
+            recordRepComplete(repScore);
+            
+            // 🏆 檢查成就解鎖
+            checkAndUnlockAchievements();
             
             // 播放成功音效
             playSuccessSound();
@@ -516,12 +1476,29 @@ export default function DeadliftCoachApp({ onBack }) {
     if (currentPhase.current === 'STANDING' && repCount > 0) {
       const restTime = now - lastActivityTime.current;
       if (restTime > REP_COUNTER_CONFIG.restTimeThreshold) {
-        // 記錄前一組
+        // 記錄前一組到歷史
         repHistory.current.push(repCount);
+        recordSetComplete(repCount, setCount);  // 📊 記錄到訓練歷史
+        recordSetComplete_Goals(repCount);       // 🎯 更新目標進度
+        
+        // ⏱️ 自動啟動休息計時器
+        if (restTimer.autoStart) {
+          startRestTimer();
+          if (voiceEnabled) {
+            speakMessage(`第${setCount}組完成，${repCount}下，開始休息`, 'info');
+          }
+        }
+        
         setSetCount(prev => prev + 1);
         setRepCount(0);
         lastActivityTime.current = now;
+        lastSetEndTime.current = now;
       }
+    }
+    
+    // ⏱️ 當開始新動作時，自動停止休息計時器
+    if (currentPhase.current !== 'STANDING' && restTimer.isActive) {
+      stopRestTimer();
     }
     
     return {
@@ -707,6 +1684,9 @@ export default function DeadliftCoachApp({ onBack }) {
     // 4.5 🔢 更新硬舉計數器
     const counterResult = updateRepCounter(hipAngle);
     
+    // 4.6 🏆 更新即時評分
+    updateRealtimeScore(spineResult, hipAngle, counterResult.phase);
+    
     // 5. 更新角度狀態
     const newAngles = {
       knee: kneeAngle,
@@ -722,6 +1702,10 @@ export default function DeadliftCoachApp({ onBack }) {
       // 播放警告音效（只在確認狀態為危險時播放）
       if (spineResult.confirmedStatus === 'critical' || spineResult.confirmedStatus === 'danger') {
         playWarningSound(spineResult.confirmedStatus);
+        // 🗣️ 播放語音警告
+        speakPostureWarning(spineResult.status, spineResult.confirmedStatus);
+        // 📊 記錄姿勢警告到歷史
+        recordPostureWarning('rounded_back');
       }
     } else {
       setSpineStatus({ 
@@ -811,36 +1795,70 @@ export default function DeadliftCoachApp({ onBack }) {
         if (data.ml_ready && data.A) {
           setMlLabels(data.A);
           
-          // 🎯 整合警告邏輯：即時偵測 + ML 確認
+          // 🎯 整合警告邏輯：以即時偵測為主，ML 作為輔助確認
+          // 因為 ML 模型可能有類別不平衡問題，優先信任即時偵測結果
           const spineWarning = data.spine?.is_rounded;
-          const mlHasRoundedBack = data.A.includes('rounded_back');
+          const spineStatus = data.spine?.status;
+          const confirmedStatus = data.spine?.confirmed_status;
           
-          if (spineWarning && mlHasRoundedBack) {
-            // 雙重確認：即時 + ML 都偵測到 → 強烈警告
-            setCombinedWarning({
-              level: 'critical',
-              message: '🚨 AI 確認：圓背姿勢！請立即調整',
-              source: 'both'
-            });
-          } else if (mlHasRoundedBack) {
-            // 只有 ML 偵測到 → 中度警告
-            setCombinedWarning({
-              level: 'ml-warning',
-              message: '🤖 AI 分析：偵測到圓背傾向',
-              source: 'ml'
-            });
+          // 檢查中文或英文標籤
+          const mlHasRoundedBack = data.A.includes('背部彎曲') || data.A.includes('rounded_back');
+          const mlHasGoodForm = data.A.includes('正確動作') || data.A.includes('good_form');
+          
+          // 優先級：即時確認狀態 > ML 結果
+          if (confirmedStatus === 'critical' || confirmedStatus === 'danger') {
+            // 即時偵測已確認危險
+            if (mlHasRoundedBack) {
+              // 雙重確認
+              setCombinedWarning({
+                level: 'critical',
+                message: '🚨 雙重確認：背部嚴重彎曲！請立即調整',
+                source: 'both'
+              });
+            } else {
+              // 只有即時偵測確認
+              setCombinedWarning({
+                level: 'danger',
+                message: `🔴 偵測到背部彎曲 (${data.spine?.spine_curvature?.toFixed(0)}°)`,
+                source: 'realtime'
+              });
+            }
           } else if (spineWarning) {
-            // 只有即時偵測 → 輕度警告（可能誤報）
+            // 即時偵測有警告但未確認
             setCombinedWarning({
-              level: 'realtime-warning',
-              message: '⚠️ 注意背部姿勢（待 AI 確認）',
+              level: 'warning',
+              message: '⚠️ 注意背部姿勢',
               source: 'realtime'
             });
-          } else if (data.A.length > 0) {
-            // ML 偵測到其他問題
+          } else if (spineStatus === 'safe' && !mlHasRoundedBack) {
+            // 即時偵測安全，ML 沒有警告 → 姿勢正確
+            setCombinedWarning({
+              level: 'good',
+              message: '✅ 姿勢良好',
+              source: 'combined'
+            });
+          } else if (spineStatus === 'safe' && mlHasRoundedBack) {
+            // 即時偵測安全但 ML 有警告 → 可能是 ML 誤判，顯示提示但不警告
             setCombinedWarning({
               level: 'info',
-              message: `🤖 AI 建議：${data.A.join('、')}`,
+              message: '👀 AI 建議注意背部（即時偵測正常）',
+              source: 'ml'
+            });
+          } else if (mlHasGoodForm) {
+            // ML 確認姿勢正確
+            setCombinedWarning({
+              level: 'good',
+              message: '✅ 姿勢良好',
+              source: 'ml'
+            });
+          } else if (data.A.length > 0 && !mlHasRoundedBack) {
+            // ML 偵測到其他問題（非背部彎曲）
+            const translatedLabels = data.A.map(label => 
+              ML_LABEL_TRANSLATIONS[label] || label
+            ).join('、');
+            setCombinedWarning({
+              level: 'info',
+              message: `🤖 AI 建議：${translatedLabels}`,
               source: 'ml'
             });
           } else {
@@ -1016,33 +2034,164 @@ export default function DeadliftCoachApp({ onBack }) {
       {/* 📏 位置/距離檢測提示 - 最上方顯示 */}
       <PositionIndicator positionStatus={positionStatus} />
       
-      {/* 🆕 分析模式選擇器 */}
-      <div className="analysis-mode-selector">
-        <div className="mode-label">分析模式：</div>
-        <div className="mode-buttons">
-          <button 
-            className={`mode-btn ${analysisMode === 'realtime' ? 'active' : ''}`}
-            onClick={() => setAnalysisMode('realtime')}
-            title="只使用前端即時計算，不需網路連線"
-          >
-            ⚡ 即時
-          </button>
-          <button 
-            className={`mode-btn ${analysisMode === 'ai' ? 'active' : ''}`}
-            onClick={() => setAnalysisMode('ai')}
-            title="只使用後端 AI 機器學習模型分析"
-          >
-            🤖 AI
-          </button>
-          <button 
-            className={`mode-btn ${analysisMode === 'combined' ? 'active' : ''}`}
-            onClick={() => setAnalysisMode('combined')}
-            title="結合即時計算 + AI 模型，提供最完整的分析"
-          >
-            🔗 組合
-          </button>
+      {/* �️ 控制面板：分析模式 + 語音設定 */}
+      <div className="control-panel">
+        {/* 分析模式選擇器 */}
+        <div className="analysis-mode-selector">
+          <div className="mode-label">分析模式：</div>
+          <div className="mode-buttons">
+            <button 
+              className={`mode-btn ${analysisMode === 'realtime' ? 'active' : ''}`}
+              onClick={() => setAnalysisMode('realtime')}
+              title="只使用前端即時計算，不需網路連線"
+            >
+              ⚡ 即時
+            </button>
+            <button 
+              className={`mode-btn ${analysisMode === 'ai' ? 'active' : ''}`}
+              onClick={() => setAnalysisMode('ai')}
+              title="只使用後端 AI 機器學習模型分析"
+            >
+              🤖 AI
+            </button>
+            <button 
+              className={`mode-btn ${analysisMode === 'combined' ? 'active' : ''}`}
+              onClick={() => setAnalysisMode('combined')}
+              title="結合即時計算 + AI 模型，提供最完整的分析"
+            >
+              🔗 組合
+            </button>
+          </div>
         </div>
+        
+        {/* 🗣️ 語音設定控制 */}
+        <div className="voice-control">
+          <button 
+            className={`voice-toggle-btn ${voiceEnabled ? 'active' : ''}`}
+            onClick={() => setVoiceEnabled(!voiceEnabled)}
+            title={voiceEnabled ? '點擊關閉語音提示' : '點擊開啟語音提示'}
+          >
+            {voiceEnabled ? '🔊' : '🔇'} 語音
+          </button>
+          
+          {voiceEnabled && (
+            <div className="volume-slider">
+              <input 
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={voiceVolume}
+                onChange={(e) => setVoiceVolume(parseFloat(e.target.value))}
+                title={`音量: ${Math.round(voiceVolume * 100)}%`}
+              />
+              <span className="volume-label">{Math.round(voiceVolume * 100)}%</span>
+            </div>
+          )}
+        </div>
+        
+        {/* 📊 訓練歷史按鈕 */}
+        <button 
+          className={`history-toggle-btn ${showHistory ? 'active' : ''}`}
+          onClick={() => setShowHistory(!showHistory)}
+          title="查看訓練歷史紀錄"
+        >
+          📊 歷史 ({trainingHistory.length})
+        </button>
+        
+        {/* 結束訓練按鈕 */}
+        <button 
+          className="end-session-btn"
+          onClick={() => {
+            const record = endTrainingSession();
+            if (record) {
+              alert(`訓練已儲存！\n總次數: ${record.totalReps}\n組數: ${record.sets}\n姿勢評分: ${record.formScore}/100`);
+              startTrainingSession();
+            }
+          }}
+          title="結束當前訓練並儲存紀錄"
+        >
+          💾 儲存訓練
+        </button>
+        
+        {/* ⏱️ 休息計時器按鈕 */}
+        <button 
+          className={`timer-toggle-btn ${restTimer.showTimer ? 'active' : ''}`}
+          onClick={() => setRestTimer(prev => ({ ...prev, showTimer: !prev.showTimer }))}
+          title="組間休息計時器"
+        >
+          ⏱️ 休息 {restTimer.isActive && `(${Math.floor(restTimer.timeLeft / 60)}:${(restTimer.timeLeft % 60).toString().padStart(2, '0')})`}
+        </button>
+        
+        {/* 🎯 目標設定按鈕 */}
+        <button 
+          className={`goal-toggle-btn ${dailyGoals.showGoalPanel ? 'active' : ''} ${
+            dailyGoals.currentReps >= dailyGoals.targetReps ? 'complete' : ''
+          }`}
+          onClick={() => setDailyGoals(prev => ({ ...prev, showGoalPanel: !prev.showGoalPanel }))}
+          title="今日目標設定"
+        >
+          🎯 目標 ({dailyGoals.currentReps}/{dailyGoals.targetReps})
+        </button>
+        
+        {/* 🏆 成就徽章按鈕 */}
+        <button 
+          className={`achievement-toggle-btn ${achievements.showPanel ? 'active' : ''}`}
+          onClick={() => setAchievements(prev => ({ ...prev, showPanel: !prev.showPanel }))}
+          title="查看成就徽章"
+        >
+          🏆 成就 ({achievements.unlocked.length})
+        </button>
       </div>
+      
+      {/* 📊 訓練歷史面板 */}
+      {showHistory && (
+        <TrainingHistoryPanel 
+          history={trainingHistory}
+          onDelete={deleteHistoryRecord}
+          onClearAll={clearAllHistory}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
+      
+      {/* ⏱️ 休息計時器面板 */}
+      {restTimer.showTimer && (
+        <RestTimerPanel 
+          timer={restTimer}
+          onStart={startRestTimer}
+          onStop={stopRestTimer}
+          onToggle={toggleRestTimer}
+          onSetDuration={setRestDuration}
+          onHide={hideRestTimer}
+        />
+      )}
+      
+      {/* 🎯 目標設定面板 */}
+      {dailyGoals.showGoalPanel && (
+        <GoalSettingPanel 
+          goals={dailyGoals}
+          onUpdateGoal={updateDailyGoal}
+          onClose={() => setDailyGoals(prev => ({ ...prev, showGoalPanel: false }))}
+          achievementStats={achievements.stats}
+        />
+      )}
+      
+      {/* 🏆 成就展示面板 */}
+      {achievements.showPanel && (
+        <AchievementPanel 
+          achievements={achievements}
+          achievementDefs={ACHIEVEMENT_DEFINITIONS}
+          onClose={() => setAchievements(prev => ({ ...prev, showPanel: false }))}
+        />
+      )}
+      
+      {/* 🎊 成就解鎖通知 */}
+      {achievements.newUnlocked && (
+        <AchievementUnlockNotification 
+          achievement={achievements.newUnlocked}
+          onClose={() => setAchievements(prev => ({ ...prev, newUnlocked: null }))}
+        />
+      )}
       
       {/* 動作狀態指示 */}
       <div className="status-bar">
@@ -1053,15 +2202,46 @@ export default function DeadliftCoachApp({ onBack }) {
       
       {/* 🔢 大型計數器顯示（視頻左上角）- 優化版 */}
       <div className={`rep-counter-overlay ${lastRepFeedback ? 'rep-success' : ''}`}>
-        {/* 完成動作的慶祝動畫 */}
+        {/* 完成動作的慶祝動畫（含分數） */}
         {lastRepFeedback && (
           <div className="rep-celebration">
             <span className="celebration-text">+1</span>
+            {lastRepFeedback.score !== undefined && (
+              <div className="score-popup" style={{ color: getScoreColor(lastRepFeedback.score) }}>
+                <span className="score-grade">{lastRepFeedback.grade.emoji} {lastRepFeedback.grade.grade}</span>
+                <span className="score-value">{lastRepFeedback.score}分</span>
+              </div>
+            )}
           </div>
         )}
         
         <div className="rep-count-big">{repCount}</div>
         <div className="rep-count-label">REPS</div>
+        
+        {/* 🏆 即時評分顯示 */}
+        {isDoingDeadlift && (
+          <div className="realtime-score">
+            <div 
+              className="score-circle"
+              style={{ borderColor: getScoreColor(currentRepScore) }}
+            >
+              <span className="score-number" style={{ color: getScoreColor(currentRepScore) }}>
+                {currentRepScore}
+              </span>
+            </div>
+            <span className="score-label">即時評分</span>
+          </div>
+        )}
+        
+        {/* 平均分數 */}
+        {repScores.length > 0 && (
+          <div className="avg-score-display">
+            <span className="avg-label">平均</span>
+            <span className="avg-value" style={{ color: getScoreColor(avgRepScore) }}>
+              {avgRepScore}分
+            </span>
+          </div>
+        )}
         
         {/* 動作進度條 */}
         <div className="rep-progress-container">
@@ -1136,24 +2316,45 @@ export default function DeadliftCoachApp({ onBack }) {
               <div className="feedback-box feedback-ai-mode">
                 <span className="mode-indicator">🤖 AI 分析模式</span>
                 {mlReady ? (
-                  mlLabels.length > 0 ? (
-                    <div className="ai-only-feedback">
-                      <span className="warning-icon">⚠️</span>
-                      AI 偵測到：{mlLabels.join('、')}
-                    </div>
-                  ) : (
-                    <div className="ai-only-feedback good">
-                      ✅ AI 分析：姿勢正確
-                    </div>
-                  )
+                  (() => {
+                    // 檢查是否有正確動作標籤
+                    const hasGoodForm = mlLabels.includes('正確動作') || mlLabels.includes('good_form');
+                    // 過濾掉「正確動作」後的警告標籤
+                    const warningLabels = mlLabels.filter(l => l !== '正確動作' && l !== 'good_form');
+                    
+                    if (hasGoodForm && warningLabels.length === 0) {
+                      return (
+                        <div className="ai-only-feedback good">
+                          ✅ AI 分析：姿勢正確
+                        </div>
+                      );
+                    } else if (warningLabels.length > 0) {
+                      // 翻譯標籤
+                      const translatedLabels = warningLabels.map(label => 
+                        ML_LABEL_TRANSLATIONS[label] || label
+                      ).join('、');
+                      return (
+                        <div className="ai-only-feedback warning">
+                          <span className="warning-icon">⚠️</span>
+                          AI 偵測到：{translatedLabels}
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="ai-only-feedback good">
+                          ✅ AI 分析：未偵測到問題
+                        </div>
+                      );
+                    }
+                  })()
                 ) : (
                   <div className="ai-only-feedback loading">
                     ⏳ AI 正在學習中... ({mlFrameCount}/30 幀)
                   </div>
                 )}
               </div>
-            ) : (
-              // 即時模式或組合模式：顯示即時回饋
+            ) : analysisMode === 'realtime' ? (
+              // 即時模式：只顯示即時偵測結果
               <div className={`feedback-box ${
                 isDoingDeadlift && spineStatus.confirmedStatus === 'critical' ? 'feedback-critical' :
                 isDoingDeadlift && spineStatus.confirmedStatus === 'danger' ? 'feedback-error' :
@@ -1161,11 +2362,31 @@ export default function DeadliftCoachApp({ onBack }) {
                 isDoingDeadlift && spineStatus.status === 'monitoring' ? 'feedback-monitoring' :
                 'feedback-good'
               }`}>
-                {analysisMode === 'realtime' && (
-                  <span className="mode-indicator">⚡ 即時分析模式</span>
-                )}
+                <span className="mode-indicator">⚡ 即時分析模式</span>
                 {isDoingDeadlift && (spineStatus.confirmedStatus === 'critical' || spineStatus.confirmedStatus === 'danger') && <span className="warning-icon">⚠️</span>}
                 {isDoingDeadlift ? spineStatus.message : '準備就緒，請開始動作'}
+              </div>
+            ) : (
+              // 組合模式：顯示整合後的結果
+              <div className={`feedback-box ${
+                combinedWarning?.level === 'critical' ? 'feedback-critical' :
+                combinedWarning?.level === 'danger' ? 'feedback-error' :
+                combinedWarning?.level === 'warning' ? 'feedback-warning' :
+                combinedWarning?.level === 'good' ? 'feedback-good' :
+                combinedWarning?.level === 'info' ? 'feedback-info' :
+                'feedback-good'
+              }`}>
+                <span className="mode-indicator">🔗 組合分析模式</span>
+                {combinedWarning ? (
+                  <div className="combined-feedback">
+                    {combinedWarning.message}
+                    {combinedWarning.source === 'both' && (
+                      <span className="source-badge both">雙重確認</span>
+                    )}
+                  </div>
+                ) : (
+                  isDoingDeadlift ? '分析中...' : '準備就緒，請開始動作'
+                )}
               </div>
             )}
           </div>
@@ -1335,17 +2556,451 @@ const RepCounter = ({ repCount, setCount, totalReps, bestReps, repPhase, repProg
 };
 
 // ============================================
-// 🤖 組件：ML 分析結果面板
+// ⏱️ 休息計時器組件
 // ============================================
-const ML_LABEL_TRANSLATIONS = {
-  'rounded_back': '🔴 圓背',
-  'early_hip_drive': '⚠️ 過早伸髖',
-  'knee_cave': '⚠️ 膝蓋內夾',
-  'good_form': '✅ 姿勢良好',
-  'lockout_incomplete': '⚠️ 鎖定不完全',
-  'bar_drift': '⚠️ 槓鈴偏移',
-  'hyperextension': '⚠️ 過度後仰',
-  // 添加更多標籤翻譯...
+const RestTimerPanel = ({ 
+  timer, 
+  onStart, 
+  onStop, 
+  onToggle, 
+  onSetDuration, 
+  onHide 
+}) => {
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  const progress = timer.totalTime > 0 
+    ? ((timer.totalTime - timer.timeLeft) / timer.totalTime) * 100 
+    : 0;
+  
+  const presetTimes = [60, 90, 120, 180];
+  
+  return (
+    <div className="rest-timer-panel">
+      <div className="timer-header">
+        <span className="timer-title">⏱️ 組間休息</span>
+        <button className="timer-close-btn" onClick={onHide}>✕</button>
+      </div>
+      
+      {/* 計時器顯示 */}
+      <div className={`timer-display ${timer.isActive ? 'active' : ''}`}>
+        <svg className="timer-circle" viewBox="0 0 100 100">
+          <circle 
+            className="timer-circle-bg"
+            cx="50" cy="50" r="45"
+          />
+          <circle 
+            className="timer-circle-progress"
+            cx="50" cy="50" r="45"
+            style={{
+              strokeDasharray: `${2 * Math.PI * 45}`,
+              strokeDashoffset: `${2 * Math.PI * 45 * (1 - progress / 100)}`
+            }}
+          />
+        </svg>
+        <div className="timer-time">
+          {timer.timeLeft > 0 ? formatTime(timer.timeLeft) : formatTime(timer.totalTime)}
+        </div>
+        <div className="timer-status">
+          {timer.isActive ? '休息中...' : timer.timeLeft > 0 ? '已暫停' : '準備就緒'}
+        </div>
+      </div>
+      
+      {/* 控制按鈕 */}
+      <div className="timer-controls">
+        {!timer.isActive && timer.timeLeft === 0 && (
+          <button className="timer-btn start" onClick={() => onStart()}>
+            ▶️ 開始休息
+          </button>
+        )}
+        {(timer.isActive || timer.timeLeft > 0) && (
+          <>
+            <button className="timer-btn toggle" onClick={onToggle}>
+              {timer.isActive ? '⏸️ 暫停' : '▶️ 繼續'}
+            </button>
+            <button className="timer-btn stop" onClick={onStop}>
+              ⏹️ 停止
+            </button>
+          </>
+        )}
+      </div>
+      
+      {/* 預設時間選擇 */}
+      <div className="timer-presets">
+        <span className="preset-label">快速設定：</span>
+        <div className="preset-buttons">
+          {presetTimes.map(time => (
+            <button 
+              key={time}
+              className={`preset-btn ${timer.totalTime === time ? 'active' : ''}`}
+              onClick={() => onSetDuration(time)}
+            >
+              {time >= 60 ? `${time / 60}分` : `${time}秒`}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// 🎯 目標設定面板組件
+// ============================================
+const GoalSettingPanel = ({ 
+  goals, 
+  onUpdateGoal, 
+  onClose,
+  achievementStats 
+}) => {
+  const [editMode, setEditMode] = useState(false);
+  const [tempTargetSets, setTempTargetSets] = useState(goals.targetSets);
+  const [tempTargetReps, setTempTargetReps] = useState(goals.targetReps);
+  
+  const setsProgress = goals.targetSets > 0 
+    ? Math.min(100, (goals.currentSets / goals.targetSets) * 100)
+    : 0;
+  const repsProgress = goals.targetReps > 0 
+    ? Math.min(100, (goals.currentReps / goals.targetReps) * 100)
+    : 0;
+  
+  const isGoalComplete = goals.currentSets >= goals.targetSets && 
+                         goals.currentReps >= goals.targetReps;
+
+  const handleSave = () => {
+    onUpdateGoal(tempTargetSets, tempTargetReps);
+    setEditMode(false);
+  };
+
+  return (
+    <div className="goal-panel-overlay">
+      <div className="goal-panel">
+        <div className="goal-header">
+          <h3>🎯 今日目標</h3>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+        
+        {/* 目標完成慶祝 */}
+        {isGoalComplete && (
+          <div className="goal-complete-banner">
+            <span className="complete-icon">🎉</span>
+            <span className="complete-text">今日目標已達成！</span>
+          </div>
+        )}
+        
+        {/* 目標進度顯示 */}
+        <div className="goal-progress-section">
+          {/* 組數進度 */}
+          <div className="goal-item">
+            <div className="goal-item-header">
+              <span className="goal-label">📦 組數目標</span>
+              <span className="goal-values">
+                {goals.currentSets} / {goals.targetSets}
+              </span>
+            </div>
+            <div className="goal-progress-track">
+              <div 
+                className={`goal-progress-fill ${setsProgress >= 100 ? 'complete' : ''}`}
+                style={{ width: `${setsProgress}%` }}
+              />
+            </div>
+            <span className="goal-percent">{Math.round(setsProgress)}%</span>
+          </div>
+          
+          {/* 次數進度 */}
+          <div className="goal-item">
+            <div className="goal-item-header">
+              <span className="goal-label">🏋️ 次數目標</span>
+              <span className="goal-values">
+                {goals.currentReps} / {goals.targetReps}
+              </span>
+            </div>
+            <div className="goal-progress-track">
+              <div 
+                className={`goal-progress-fill ${repsProgress >= 100 ? 'complete' : ''}`}
+                style={{ width: `${repsProgress}%` }}
+              />
+            </div>
+            <span className="goal-percent">{Math.round(repsProgress)}%</span>
+          </div>
+        </div>
+        
+        {/* 編輯目標 */}
+        {editMode ? (
+          <div className="goal-edit-section">
+            <div className="goal-edit-row">
+              <label>目標組數：</label>
+              <input 
+                type="number" 
+                min="1" 
+                max="20"
+                value={tempTargetSets}
+                onChange={(e) => setTempTargetSets(parseInt(e.target.value) || 1)}
+              />
+            </div>
+            <div className="goal-edit-row">
+              <label>目標次數：</label>
+              <input 
+                type="number" 
+                min="1" 
+                max="200"
+                value={tempTargetReps}
+                onChange={(e) => setTempTargetReps(parseInt(e.target.value) || 1)}
+              />
+            </div>
+            <div className="goal-edit-buttons">
+              <button className="save-btn" onClick={handleSave}>💾 儲存</button>
+              <button className="cancel-btn" onClick={() => setEditMode(false)}>取消</button>
+            </div>
+          </div>
+        ) : (
+          <button className="edit-goal-btn" onClick={() => setEditMode(true)}>
+            ✏️ 修改目標
+          </button>
+        )}
+        
+        {/* 統計摘要 */}
+        {achievementStats && (
+          <div className="goal-stats-summary">
+            <h4>📊 累計統計</h4>
+            <div className="stats-grid">
+              <div className="stat-box">
+                <span className="stat-value">{achievementStats.totalReps}</span>
+                <span className="stat-label">總次數</span>
+              </div>
+              <div className="stat-box">
+                <span className="stat-value">{achievementStats.consecutiveDays}</span>
+                <span className="stat-label">連續天數</span>
+              </div>
+              <div className="stat-box">
+                <span className="stat-value">{achievementStats.perfectReps}</span>
+                <span className="stat-label">完美次數</span>
+              </div>
+              <div className="stat-box">
+                <span className="stat-value">{achievementStats.avgScore || 0}</span>
+                <span className="stat-label">平均分數</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// 🏆 成就展示面板組件
+// ============================================
+const AchievementPanel = ({ 
+  achievements, 
+  achievementDefs,
+  onClose 
+}) => {
+  const unlockedSet = new Set(achievements.unlocked);
+  const allAchievements = Object.values(achievementDefs);
+  const unlockedCount = achievements.unlocked.length;
+  const totalCount = allAchievements.length;
+  
+  return (
+    <div className="achievement-panel-overlay">
+      <div className="achievement-panel">
+        <div className="achievement-header">
+          <h3>🏆 成就徽章</h3>
+          <span className="achievement-count">{unlockedCount}/{totalCount}</span>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+        
+        {/* 成就進度 */}
+        <div className="achievement-progress">
+          <div className="achievement-progress-bar">
+            <div 
+              className="achievement-progress-fill"
+              style={{ width: `${(unlockedCount / totalCount) * 100}%` }}
+            />
+          </div>
+          <span className="achievement-progress-text">
+            已解鎖 {Math.round((unlockedCount / totalCount) * 100)}%
+          </span>
+        </div>
+        
+        {/* 成就列表 */}
+        <div className="achievement-list">
+          {allAchievements.map(achievement => {
+            const isUnlocked = unlockedSet.has(achievement.id);
+            return (
+              <div 
+                key={achievement.id}
+                className={`achievement-item ${isUnlocked ? 'unlocked' : 'locked'}`}
+              >
+                <span className="achievement-icon">
+                  {isUnlocked ? achievement.icon : '🔒'}
+                </span>
+                <div className="achievement-info">
+                  <span className="achievement-name">
+                    {isUnlocked ? achievement.name : '???'}
+                  </span>
+                  <span className="achievement-desc">
+                    {achievement.description}
+                  </span>
+                </div>
+                {isUnlocked && <span className="unlocked-badge">✓</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// 🎊 成就解鎖通知組件
+// ============================================
+const AchievementUnlockNotification = ({ achievement, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+  
+  if (!achievement) return null;
+  
+  return (
+    <div className="achievement-notification">
+      <div className="notification-content">
+        <span className="notification-icon">{achievement.icon}</span>
+        <div className="notification-text">
+          <span className="notification-title">🎉 成就解鎖！</span>
+          <span className="notification-name">{achievement.name}</span>
+          <span className="notification-desc">{achievement.description}</span>
+        </div>
+      </div>
+      <button className="notification-close" onClick={onClose}>✕</button>
+    </div>
+  );
+};
+
+// ============================================
+// 📊 訓練歷史面板組件
+// ============================================
+const TrainingHistoryPanel = ({ history, onDelete, onClearAll, onClose }) => {
+  const formatDate = (isoString) => {
+    const date = new Date(isoString);
+    return date.toLocaleDateString('zh-TW', {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  };
+  
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return mins > 0 ? `${mins}分${secs}秒` : `${secs}秒`;
+  };
+  
+  const getScoreColor = (score) => {
+    if (score >= 90) return '#22c55e';
+    if (score >= 70) return '#f59e0b';
+    return '#ef4444';
+  };
+  
+  // 計算統計摘要
+  const stats = {
+    totalSessions: history.length,
+    totalReps: history.reduce((sum, r) => sum + r.totalReps, 0),
+    avgScore: history.length > 0 
+      ? Math.round(history.reduce((sum, r) => sum + r.formScore, 0) / history.length)
+      : 0,
+    bestScore: history.length > 0 
+      ? Math.max(...history.map(r => r.formScore))
+      : 0
+  };
+
+  return (
+    <div className="history-panel-overlay">
+      <div className="history-panel">
+        <div className="history-header">
+          <h3>📊 訓練歷史紀錄</h3>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+        
+        {/* 統計摘要 */}
+        <div className="history-stats">
+          <div className="stat-item">
+            <span className="stat-value">{stats.totalSessions}</span>
+            <span className="stat-label">總訓練次數</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-value">{stats.totalReps}</span>
+            <span className="stat-label">累計 Reps</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-value" style={{ color: getScoreColor(stats.avgScore) }}>
+              {stats.avgScore}
+            </span>
+            <span className="stat-label">平均評分</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-value" style={{ color: getScoreColor(stats.bestScore) }}>
+              {stats.bestScore}
+            </span>
+            <span className="stat-label">最佳評分</span>
+          </div>
+        </div>
+        
+        {/* 歷史列表 */}
+        <div className="history-list">
+          {history.length === 0 ? (
+            <div className="no-history">
+              <span>📭</span>
+              <p>尚無訓練紀錄</p>
+              <p className="hint">完成訓練後點擊「儲存訓練」</p>
+            </div>
+          ) : (
+            [...history].reverse().map((record) => (
+              <div key={record.id} className="history-item">
+                <div className="history-item-header">
+                  <span className="history-date">{formatDate(record.date)}</span>
+                  <span 
+                    className="history-score"
+                    style={{ backgroundColor: getScoreColor(record.formScore) }}
+                  >
+                    {record.formScore}分
+                  </span>
+                </div>
+                <div className="history-item-body">
+                  <div className="history-detail">
+                    <span>🏋️ {record.totalReps} reps</span>
+                    <span>📦 {record.sets} 組</span>
+                    <span>⏱️ {formatDuration(record.duration)}</span>
+                  </div>
+                  {record.warnings.rounded_back > 0 && (
+                    <div className="history-warnings">
+                      ⚠️ 圓背警告 ×{record.warnings.rounded_back}
+                    </div>
+                  )}
+                </div>
+                <button 
+                  className="delete-btn"
+                  onClick={() => onDelete(record.id)}
+                  title="刪除此紀錄"
+                >
+                  🗑️
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+        
+        {history.length > 0 && (
+          <button className="clear-all-btn" onClick={onClearAll}>
+            🗑️ 清除所有紀錄
+          </button>
+        )}
+      </div>
+    </div>
+  );
 };
 
 const MlResultPanel = ({ mlReady, mlLabels, mlFrameCount, combinedWarning, showCombinedWarning = true }) => {
@@ -1460,3 +3115,4 @@ const PositionIndicator = ({ positionStatus }) => {
     </div>
   );
 };
+

@@ -522,6 +522,17 @@ def predict(data: FrameData):
                 # 模型推論
                 pred = clf.predict(input_vec)
                 ml_labels = list(mlb.inverse_transform(pred)[0])
+                
+                # 🆕 取得預測機率（如果模型支援）
+                try:
+                    proba = clf.predict_proba(input_vec)[0]
+                    # 找出最高機率的標籤
+                    max_proba_idx = np.argmax(proba)
+                    max_proba = float(proba[max_proba_idx])
+                    print(f"🤖 ML Prediction: {ml_labels}, max_proba: {max_proba:.2%}")
+                except Exception as e:
+                    max_proba = None
+                    
         except Exception as e:
             print(f"⚠️ ML prediction error: {e}")
     

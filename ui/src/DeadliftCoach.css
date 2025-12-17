@@ -373,8 +373,17 @@
 }
 
 /* ============================================
-   🎛️ 分析模式選擇器
+   🎛️ 控制面板（分析模式 + 語音）
    ============================================ */
+.control-panel {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
 .analysis-mode-selector {
   display: flex;
   align-items: center;
@@ -383,7 +392,6 @@
   padding: 10px 16px;
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  margin-bottom: 12px;
   backdrop-filter: blur(10px);
 }
 
@@ -464,9 +472,593 @@
   color: #15803d;
 }
 
+.ai-only-feedback.warning {
+  color: #b45309;
+}
+
 .ai-only-feedback.loading {
   color: #64748b;
   font-style: italic;
+}
+
+/* 組合模式回饋樣式 */
+.feedback-info {
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7) !important;
+  border-color: #22c55e !important;
+}
+
+.combined-feedback {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.source-badge {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.source-badge.both {
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  color: white;
+}
+
+/* ============================================
+   🗣️ 語音控制樣式
+   ============================================ */
+.voice-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 10px 16px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.voice-toggle-btn {
+  padding: 8px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 20px;
+  background: white;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.voice-toggle-btn:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.voice-toggle-btn.active {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  border-color: #22c55e;
+  color: #15803d;
+}
+
+.volume-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.volume-slider input[type="range"] {
+  width: 80px;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(to right, #22c55e 0%, #22c55e var(--value, 100%), #e2e8f0 var(--value, 100%), #e2e8f0 100%);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.volume-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #22c55e;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.volume-slider input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.volume-slider input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #22c55e;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.volume-label {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 500;
+  min-width: 35px;
+}
+
+/* ============================================
+   📊 訓練歷史面板樣式
+   ============================================ */
+.history-toggle-btn,
+.end-session-btn {
+  padding: 8px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 20px;
+  background: white;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.history-toggle-btn:hover {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+}
+
+.history-toggle-btn.active {
+  background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+  border-color: #8b5cf6;
+  color: #6d28d9;
+}
+
+.end-session-btn {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+.end-session-btn:hover {
+  background: linear-gradient(135deg, #fde68a, #fcd34d);
+}
+
+/* 歷史面板覆蓋層 */
+.history-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.history-panel {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.history-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #1e293b;
+}
+
+.history-header .close-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.history-header .close-btn:hover {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* 統計摘要 */
+.history-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* 歷史列表 */
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.no-history {
+  text-align: center;
+  padding: 40px 20px;
+  color: #94a3b8;
+}
+
+.no-history span {
+  font-size: 3rem;
+}
+
+.no-history p {
+  margin: 8px 0 0;
+}
+
+.no-history .hint {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.history-item {
+  position: relative;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s;
+}
+
+.history-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.history-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.history-date {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.history-score {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: white;
+}
+
+.history-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-detail {
+  display: flex;
+  gap: 16px;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.history-warnings {
+  font-size: 0.8rem;
+  color: #ef4444;
+  background: #fef2f2;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.history-item .delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+  padding: 4px;
+}
+
+.history-item:hover .delete-btn {
+  opacity: 0.6;
+}
+
+.history-item .delete-btn:hover {
+  opacity: 1;
+}
+
+.clear-all-btn {
+  margin: 12px 20px 16px;
+  padding: 10px;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  background: white;
+  color: #ef4444;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.clear-all-btn:hover {
+  background: #fef2f2;
+}
+
+/* ============================================
+   ⏱️ 休息計時器樣式
+   ============================================ */
+.timer-toggle-btn {
+  padding: 8px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 20px;
+  background: white;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.timer-toggle-btn:hover {
+  border-color: #06b6d4;
+  color: #06b6d4;
+}
+
+.timer-toggle-btn.active {
+  background: linear-gradient(135deg, #cffafe, #a5f3fc);
+  border-color: #06b6d4;
+  color: #0891b2;
+}
+
+/* 休息計時器面板 */
+.rest-timer-panel {
+  position: fixed;
+  bottom: 100px;
+  right: 30px;
+  width: 280px;
+  background: rgba(15, 23, 42, 0.95);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  z-index: 200;
+  animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.timer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.timer-title {
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.timer-close-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 4px;
+}
+
+.timer-close-btn:hover {
+  color: white;
+}
+
+/* 計時器圓圈顯示 */
+.timer-display {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  margin: 0 auto 20px;
+}
+
+.timer-circle {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.timer-circle-bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 8;
+}
+
+.timer-circle-progress {
+  fill: none;
+  stroke: #06b6d4;
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear;
+}
+
+.timer-display.active .timer-circle-progress {
+  stroke: #22c55e;
+}
+
+.timer-time {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -60%);
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: white;
+  font-family: 'SF Mono', 'Monaco', monospace;
+}
+
+.timer-status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* 控制按鈕 */
+.timer-controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.timer-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.timer-btn.start {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+}
+
+.timer-btn.start:hover {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+.timer-btn.toggle {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+}
+
+.timer-btn.stop {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
+/* 預設時間選擇 */
+.timer-presets {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 16px;
+}
+
+.preset-label {
+  display: block;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 8px;
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.preset-btn {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preset-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.preset-btn.active {
+  background: rgba(6, 182, 212, 0.3);
+  border-color: #06b6d4;
+  color: #06b6d4;
 }
 
 /* ============================================
@@ -532,7 +1124,10 @@
   position: absolute;
   top: -20px;
   right: -20px;
-  animation: celebrationPop 1.5s ease-out forwards;
+  animation: celebrationPop 2s ease-out forwards;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .celebration-text {
@@ -542,19 +1137,115 @@
   text-shadow: 0 0 10px rgba(74, 222, 128, 0.8);
 }
 
+/* 🏆 分數彈出動畫 */
+.score-popup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 4px;
+  animation: scoreSlide 2s ease-out forwards;
+}
+
+.score-grade {
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.score-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes scoreSlide {
+  0% { 
+    opacity: 0; 
+    transform: translateY(-10px) scale(0.8); 
+  }
+  20% { 
+    opacity: 1; 
+    transform: translateY(0) scale(1.1); 
+  }
+  80% { 
+    opacity: 1; 
+    transform: translateY(0) scale(1); 
+  }
+  100% { 
+    opacity: 0; 
+    transform: translateY(-20px) scale(0.9); 
+  }
+}
+
 @keyframes celebrationPop {
   0% { 
     opacity: 1; 
     transform: scale(0.5) translateY(0); 
   }
-  50% { 
+  30% { 
     opacity: 1; 
-    transform: scale(1.5) translateY(-20px); 
+    transform: scale(1.3) translateY(-10px); 
+  }
+  80% { 
+    opacity: 1; 
+    transform: scale(1) translateY(-15px); 
   }
   100% { 
     opacity: 0; 
-    transform: scale(1) translateY(-40px); 
+    transform: scale(0.9) translateY(-30px); 
   }
+}
+
+/* 🏆 即時評分圓圈 */
+.realtime-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 12px 0;
+}
+
+.score-circle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 4px solid #22c55e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  transition: all 0.3s ease;
+}
+
+.score-number {
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.score-label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 4px;
+}
+
+/* 平均分數顯示 */
+.avg-score-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+.avg-label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.avg-value {
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .rep-count-big {
@@ -1209,4 +1900,616 @@
 
 .position-indicator.ready .position-debug {
   color: #10B981;
+}
+
+/* ============================================
+   🎯 目標設定與成就系統樣式
+   ============================================ */
+
+/* 目標按鈕 */
+.goal-toggle-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 2px solid #8B5CF6;
+  background: linear-gradient(135deg, #EDE9FE, #F3E8FF);
+  color: #6D28D9;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.goal-toggle-btn:hover {
+  background: linear-gradient(135deg, #DDD6FE, #E9D5FF);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.goal-toggle-btn.active {
+  background: linear-gradient(135deg, #8B5CF6, #A78BFA);
+  color: white;
+  border-color: #7C3AED;
+}
+
+.goal-toggle-btn.complete {
+  background: linear-gradient(135deg, #10B981, #34D399);
+  border-color: #059669;
+  color: white;
+  animation: goalPulse 2s infinite;
+}
+
+@keyframes goalPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+}
+
+/* 成就按鈕 */
+.achievement-toggle-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 2px solid #F59E0B;
+  background: linear-gradient(135deg, #FEF3C7, #FFFBEB);
+  color: #B45309;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.achievement-toggle-btn:hover {
+  background: linear-gradient(135deg, #FDE68A, #FEF3C7);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.achievement-toggle-btn.active {
+  background: linear-gradient(135deg, #F59E0B, #FBBF24);
+  color: white;
+  border-color: #D97706;
+}
+
+/* ============================================
+   🎯 目標設定面板
+   ============================================ */
+.goal-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.goal-panel {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.goal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #E5E7EB;
+  background: linear-gradient(135deg, #EDE9FE, #F3E8FF);
+  border-radius: 16px 16px 0 0;
+}
+
+.goal-header h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #6D28D9;
+}
+
+/* 目標完成橫幅 */
+.goal-complete-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, #10B981, #34D399);
+  color: white;
+  animation: celebrateBanner 0.5s ease;
+}
+
+@keyframes celebrateBanner {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.complete-icon {
+  font-size: 2rem;
+  animation: bounce 1s infinite;
+}
+
+.complete-text {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+/* 目標進度區塊 */
+.goal-progress-section {
+  padding: 20px;
+}
+
+.goal-item {
+  margin-bottom: 20px;
+}
+
+.goal-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.goal-label {
+  font-weight: 600;
+  color: #374151;
+}
+
+.goal-values {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #6D28D9;
+}
+
+.goal-progress-track {
+  height: 12px;
+  background: #E5E7EB;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.goal-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8B5CF6, #A78BFA);
+  border-radius: 6px;
+  transition: width 0.5s ease;
+}
+
+.goal-progress-fill.complete {
+  background: linear-gradient(90deg, #10B981, #34D399);
+}
+
+.goal-percent {
+  font-size: 0.85rem;
+  color: #6B7280;
+}
+
+/* 目標編輯區塊 */
+.goal-edit-section {
+  padding: 20px;
+  border-top: 1px solid #E5E7EB;
+  background: #F9FAFB;
+}
+
+.goal-edit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.goal-edit-row label {
+  font-weight: 500;
+  color: #374151;
+}
+
+.goal-edit-row input {
+  width: 80px;
+  padding: 8px 12px;
+  border: 2px solid #D1D5DB;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+.goal-edit-row input:focus {
+  outline: none;
+  border-color: #8B5CF6;
+}
+
+.goal-edit-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.goal-edit-buttons .save-btn {
+  flex: 1;
+  padding: 12px;
+  background: linear-gradient(135deg, #8B5CF6, #A78BFA);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.goal-edit-buttons .save-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.goal-edit-buttons .cancel-btn {
+  flex: 1;
+  padding: 12px;
+  background: #E5E7EB;
+  color: #4B5563;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.edit-goal-btn {
+  display: block;
+  width: calc(100% - 40px);
+  margin: 0 20px 20px;
+  padding: 12px;
+  background: #F3F4F6;
+  border: 2px dashed #D1D5DB;
+  border-radius: 8px;
+  font-weight: 600;
+  color: #6B7280;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.edit-goal-btn:hover {
+  background: #E5E7EB;
+  border-color: #9CA3AF;
+  color: #374151;
+}
+
+/* 統計摘要 */
+.goal-stats-summary {
+  padding: 20px;
+  border-top: 1px solid #E5E7EB;
+  background: #FAFAFA;
+  border-radius: 0 0 16px 16px;
+}
+
+.goal-stats-summary h4 {
+  margin: 0 0 16px;
+  color: #374151;
+  font-size: 1rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.stat-box {
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.stat-box .stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #6D28D9;
+}
+
+.stat-box .stat-label {
+  display: block;
+  font-size: 0.8rem;
+  color: #6B7280;
+  margin-top: 4px;
+}
+
+/* ============================================
+   🏆 成就徽章面板
+   ============================================ */
+.achievement-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.achievement-panel {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 480px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+.achievement-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #E5E7EB;
+  background: linear-gradient(135deg, #FEF3C7, #FFFBEB);
+  border-radius: 16px 16px 0 0;
+}
+
+.achievement-header h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #B45309;
+}
+
+.achievement-count {
+  background: linear-gradient(135deg, #F59E0B, #FBBF24);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+/* 成就進度條 */
+.achievement-progress {
+  padding: 16px 20px;
+  background: #FFFBEB;
+}
+
+.achievement-progress-bar {
+  height: 8px;
+  background: #FDE68A;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.achievement-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #F59E0B, #FBBF24);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.achievement-progress-text {
+  font-size: 0.85rem;
+  color: #92400E;
+  font-weight: 500;
+}
+
+/* 成就列表 */
+.achievement-list {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.achievement-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #F9FAFB;
+  border: 2px solid #E5E7EB;
+  transition: all 0.3s ease;
+}
+
+.achievement-item.unlocked {
+  background: linear-gradient(135deg, #FFFBEB, #FEF3C7);
+  border-color: #FCD34D;
+}
+
+.achievement-item.locked {
+  opacity: 0.6;
+}
+
+.achievement-icon {
+  font-size: 2rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.achievement-item.locked .achievement-icon {
+  background: #E5E7EB;
+  color: #9CA3AF;
+}
+
+.achievement-info {
+  flex: 1;
+}
+
+.achievement-name {
+  display: block;
+  font-weight: 700;
+  color: #1F2937;
+  font-size: 1rem;
+}
+
+.achievement-desc {
+  display: block;
+  font-size: 0.85rem;
+  color: #6B7280;
+  margin-top: 4px;
+}
+
+.achievement-item.locked .achievement-name {
+  color: #9CA3AF;
+}
+
+.unlocked-badge {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #10B981, #34D399);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+/* ============================================
+   🎊 成就解鎖通知
+   ============================================ */
+.achievement-notification {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #F59E0B, #FBBF24);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 10px 40px rgba(245, 158, 11, 0.4);
+  z-index: 2000;
+  animation: achievementSlideIn 0.5s ease, achievementGlow 2s infinite;
+}
+
+@keyframes achievementSlideIn {
+  from {
+    transform: translateX(-50%) translateY(-100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes achievementGlow {
+  0%, 100% { box-shadow: 0 10px 40px rgba(245, 158, 11, 0.4); }
+  50% { box-shadow: 0 10px 60px rgba(245, 158, 11, 0.6), 0 0 30px rgba(255, 215, 0, 0.3); }
+}
+
+.notification-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.notification-icon {
+  font-size: 2.5rem;
+  animation: notificationBounce 1s infinite;
+}
+
+@keyframes notificationBounce {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.2) rotate(-10deg); }
+  75% { transform: scale(1.2) rotate(10deg); }
+}
+
+.notification-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.notification-title {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.notification-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.notification-desc {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.notification-close {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.3s;
+}
+
+.notification-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ============================================
+   🎯 迷你目標進度（顯示在視頻下方）
+   ============================================ */
+.mini-goal-progress {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px 16px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+  font-size: 0.85rem;
+}
+
+.mini-goal-bar {
+  width: 100px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.mini-goal-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8B5CF6, #10B981);
+  border-radius: 3px;
+  transition: width 0.3s ease;
 }
