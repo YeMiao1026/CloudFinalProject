@@ -1,5 +1,6 @@
 # render.yaml - Render Blueprint spec
 # https://render.com/docs/blueprint-spec
+# Note: Static Sites must be created manually in Render Dashboard
 
 services:
   - type: web
@@ -15,13 +16,18 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
 
-staticSites:
-  - name: cloudfinal-ui
-    repo: https://github.com/YeMiao1026/CloudFinalProject
-    branch: main
-    rootDir: ui
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    envVars:
-      - key: VITE_API_BASE
-        value: "https://cloudfinal-backend.onrender.com"
+# ============================================
+# 📌 Frontend (Static Site) - 需手動建立
+# ============================================
+# Render Blueprint 不支援 Static Sites，請在 Dashboard 手動建立：
+# 
+# 1. New → Static Site
+# 2. 設定：
+#    - Name: cloudfinal-ui
+#    - Repository: YeMiao1026/CloudFinalProject
+#    - Branch: main
+#    - Root Directory: ui
+#    - Build Command: npm install && npm run build
+#    - Publish Directory: dist
+# 3. 環境變數：
+#    - VITE_API_BASE = https://cloudfinal-backend.onrender.com
