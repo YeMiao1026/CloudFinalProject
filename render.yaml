@@ -6,6 +6,7 @@ services:
   - type: web
     name: cloudfinal-backend
     runtime: docker
+    plan: free
     repo: https://github.com/YeMiao1026/CloudFinalProject
     branch: main
     dockerfilePath: ./pose_backend/Dockerfile
