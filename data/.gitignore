@@ -1,3 +1,20 @@
-# Ignore all files in this directory except README.md and .gitignore
+# =====================================
+# 📁 data/ 資料夾 Git 控制
+# =====================================
+# 忽略所有影片檔案（太大）
+*.mp4
+*.webm
+*.avi
+*.mov
+*.mkv
+
+# 忽略 CSV 檔案（訓練資料可能很大）
+cleaned_videos/*.csv
+
+# 保留這些檔案
 !README.md
 !.gitignore
+
+# 保留 labels 資料夾的 CSV（標註資料需要版控）
+!labels/
+!labels/*.csv
