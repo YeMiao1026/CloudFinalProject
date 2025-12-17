@@ -363,6 +363,144 @@
 }
 
 /* ============================================
+   🆕 狀態列和離線模式
+   ============================================ */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ============================================
+   🎛️ 分析模式選擇器
+   ============================================ */
+.analysis-mode-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 10px 16px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.mode-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.mode-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.mode-btn {
+  padding: 8px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 20px;
+  background: white;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.mode-btn:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+/* 即時模式 - 黃色 */
+.mode-btn.active:nth-child(1) {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+/* AI 模式 - 藍色 */
+.mode-btn.active:nth-child(2) {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+
+/* 組合模式 - 綠色 */
+.mode-btn.active:nth-child(3) {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  border-color: #22c55e;
+  color: #15803d;
+}
+
+/* 模式指示標籤 */
+.mode-indicator {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+}
+
+/* AI 專屬回饋樣式 */
+.feedback-ai-mode {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe) !important;
+  border-color: #3b82f6 !important;
+}
+
+.ai-only-feedback {
+  font-size: 1rem;
+  padding: 8px;
+}
+
+.ai-only-feedback.good {
+  color: #15803d;
+}
+
+.ai-only-feedback.loading {
+  color: #64748b;
+  font-style: italic;
+}
+
+/* ============================================
+   舊版離線按鈕（保留兼容性）
+   ============================================ */
+.offline-mode-btn {
+  padding: 6px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 20px;
+  background: white;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.offline-mode-btn:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.offline-mode-btn.active {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+.offline-mode-btn.active:hover {
+  background: linear-gradient(135deg, #fde68a, #fcd34d);
+}
+
+/* ============================================
    🔢 硬舉計數器樣式
    ============================================ */
 
@@ -379,6 +517,44 @@
   border: 2px solid rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+/* 完成動作時的成功效果 */
+.rep-counter-overlay.rep-success {
+  border-color: #4ADE80;
+  box-shadow: 0 0 30px rgba(74, 222, 128, 0.6);
+  transform: scale(1.05);
+}
+
+/* 慶祝動畫 */
+.rep-celebration {
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  animation: celebrationPop 1.5s ease-out forwards;
+}
+
+.celebration-text {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #4ADE80;
+  text-shadow: 0 0 10px rgba(74, 222, 128, 0.8);
+}
+
+@keyframes celebrationPop {
+  0% { 
+    opacity: 1; 
+    transform: scale(0.5) translateY(0); 
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1.5) translateY(-20px); 
+  }
+  100% { 
+    opacity: 0; 
+    transform: scale(1) translateY(-40px); 
+  }
 }
 
 .rep-count-big {
@@ -387,6 +563,12 @@
   color: #4ADE80;
   line-height: 1;
   text-shadow: 0 0 20px rgba(74, 222, 128, 0.5);
+  transition: all 0.2s ease;
+}
+
+.rep-counter-overlay.rep-success .rep-count-big {
+  transform: scale(1.1);
+  color: #22C55E;
 }
 
 .rep-count-label {
@@ -394,6 +576,50 @@
   font-weight: 600;
   color: rgba(255, 255, 255, 0.7);
   letter-spacing: 3px;
+  margin-top: 5px;
+}
+
+/* 🆕 進度條容器（大型計數器內） */
+.rep-progress-container {
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rep-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.rep-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.1s ease-out;
+  background: linear-gradient(90deg, #4ADE80, #22C55E);
+}
+
+.rep-progress-fill.standing {
+  background: linear-gradient(90deg, #4ADE80, #22C55E);
+}
+
+.rep-progress-fill.descending {
+  background: linear-gradient(90deg, #FBBF24, #F59E0B);
+}
+
+.rep-progress-fill.bottom {
+  background: linear-gradient(90deg, #60A5FA, #3B82F6);
+}
+
+.rep-progress-fill.ascending {
+  background: linear-gradient(90deg, #A78BFA, #8B5CF6);
+}
+
+.rep-progress-text {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
   margin-top: 5px;
 }
 
@@ -426,6 +652,7 @@
 
 .phase-dot.bottom {
   background: #60A5FA;
+  animation: bottomPulse 0.3s ease-in-out infinite;
 }
 
 .phase-dot.ascending {
@@ -436,6 +663,11 @@
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.6; transform: scale(1.2); }
+}
+
+@keyframes bottomPulse {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.7); }
+  50% { opacity: 1; transform: scale(1.3); box-shadow: 0 0 0 8px rgba(96, 165, 250, 0); }
 }
 
 /* 右側面板計數器容器 */
@@ -588,6 +820,57 @@
   transition: color 0.3s;
 }
 
+/* 🆕 右側面板進度條區域 */
+.rep-progress-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.progress-percent {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.progress-track {
+  width: 100%;
+  height: 10px;
+  background: #e2e8f0;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.1s ease-out, background 0.3s ease;
+}
+
+.progress-fill.standing {
+  background: linear-gradient(90deg, #4ADE80, #22C55E);
+}
+
+.progress-fill.descending {
+  background: linear-gradient(90deg, #FBBF24, #F59E0B);
+}
+
+.progress-fill.bottom {
+  background: linear-gradient(90deg, #60A5FA, #3B82F6);
+}
+
+.progress-fill.ascending {
+  background: linear-gradient(90deg, #A78BFA, #8B5CF6);
+}
+
 /* 響應式設計 */
 @media (max-width: 768px) {
   .rep-counter-overlay {
@@ -623,4 +906,307 @@
   .card-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ============================================
+   🤖 ML 分析結果面板樣式
+   ============================================ */
+.ml-result-panel {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 16px;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15);
+}
+
+.ml-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.ml-panel-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #E0E7FF;
+}
+
+.ml-status-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.ml-status-badge.ready {
+  background: linear-gradient(135deg, #10B981, #059669);
+  color: white;
+}
+
+.ml-status-badge.loading {
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  color: white;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ML 進度條 */
+.ml-progress-container {
+  margin-bottom: 12px;
+}
+
+.ml-progress-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.ml-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366F1, #8B5CF6, #A78BFA);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.ml-progress-text {
+  font-size: 0.75rem;
+  color: #94A3B8;
+}
+
+/* 整合警告樣式 */
+.ml-combined-warning {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ml-combined-warning .warning-message {
+  font-weight: 600;
+  flex: 1;
+}
+
+.ml-combined-warning .warning-badge {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.ml-warning-critical {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(185, 28, 28, 0.9));
+  color: white;
+  border: 2px solid #EF4444;
+  animation: shake 0.5s ease-in-out;
+}
+
+.ml-warning-critical .warning-badge.double-confirm {
+  background: white;
+  color: #DC2626;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.ml-warning-medium {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.8), rgba(217, 119, 6, 0.8));
+  color: white;
+  border: 1px solid #F59E0B;
+}
+
+.ml-warning-light {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.6), rgba(245, 158, 11, 0.6));
+  color: #1F2937;
+  border: 1px solid #FBBF24;
+}
+
+.ml-warning-info {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.6), rgba(37, 99, 235, 0.6));
+  color: white;
+  border: 1px solid #3B82F6;
+}
+
+/* ML 標籤容器 */
+.ml-labels-container {
+  margin-top: 8px;
+}
+
+.ml-labels-title {
+  font-size: 0.8rem;
+  color: #94A3B8;
+  margin-bottom: 8px;
+}
+
+.ml-labels-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ml-label-tag {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ml-label-tag.warning {
+  background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+  color: #92400E;
+  border: 1px solid #F59E0B;
+}
+
+.ml-label-tag.good {
+  background: linear-gradient(135deg, #D1FAE5, #A7F3D0);
+  color: #065F46;
+  border: 1px solid #10B981;
+}
+
+/* 無問題顯示 */
+.ml-no-issues {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2));
+  border-radius: 8px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.ml-no-issues .no-issues-icon {
+  font-size: 1.5rem;
+}
+
+.ml-no-issues .no-issues-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #10B981;
+}
+
+/* ============================================
+   📏 位置/距離檢測指示器樣式
+   ============================================ */
+.position-indicator {
+  width: 100%;
+  max-width: 600px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.3s ease;
+  margin-bottom: 8px;
+}
+
+.position-indicator.ready {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.15));
+  border: 2px solid rgba(16, 185, 129, 0.5);
+}
+
+.position-indicator.not-ready {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.2));
+  border: 2px solid rgba(245, 158, 11, 0.6);
+  animation: gentle-pulse 2s infinite;
+}
+
+@keyframes gentle-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+  }
+  50% { 
+    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
+  }
+}
+
+.position-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.position-icon {
+  font-size: 1.5rem;
+}
+
+.position-icon.ready {
+  animation: none;
+}
+
+.position-icon.warning {
+  animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.position-message {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1F2937;
+}
+
+.position-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  margin-left: 40px;
+}
+
+.suggestion-arrow {
+  font-size: 1.3rem;
+  animation: point 1s infinite;
+}
+
+@keyframes point {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(5px); }
+}
+
+.suggestion-text {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #92400E;
+}
+
+.position-debug {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 40px;
+  font-size: 0.8rem;
+  color: #6B7280;
+}
+
+.debug-hint {
+  color: #9CA3AF;
+  font-size: 0.75rem;
+}
+
+/* 位置就緒時的特殊樣式 */
+.position-indicator.ready .position-message {
+  color: #065F46;
+}
+
+.position-indicator.ready .position-debug {
+  color: #10B981;
 }

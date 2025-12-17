@@ -10,6 +10,7 @@ from PIL import Image
 import mediapipe as mp
 import os
 from collections import deque
+import math
 
 app = FastAPI(title="Pose Detection API (Back Angle with Spine Offset + ML Prediction)")
 
@@ -20,6 +21,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# =====================================
+# 🏥 運動醫學級圓背偵測閾值
+# =====================================
+SPINE_THRESHOLDS = {
+    "safe": 10,       # ≤ 10° 中立（安全）
+    "warning": 20,    # 10°-20° 輕微彎曲（警告）
+    "danger": 30,     # 20°-30° 圓背（高風險）
+    "critical": 40    # > 30° 嚴重圓背（立即停止）
+}
+
+# 時間穩定機制配置
+STABILITY_CONFIG = {
+    "frame_threshold": 10,  # 需連續 10 幀超過閾值才觸發
+    "smoothing_factor": 0.3  # 角度平滑係數
+}
+
+# 硬舉偵測閾值
+DEADLIFT_DETECTION = {
+    "hip_angle_threshold": 160  # 髖部角度低於此值時認為開始硬舉
+}
+
+# 用戶圓背偵測狀態（每個 session 獨立）
+user_spine_state = {}
 
 mp_pose = mp.solutions.pose
 # lazy initialize MediaPipe Pose to avoid loading binary resources at import time
@@ -129,6 +154,140 @@ class DeadliftFeatureExtractor:
         ]
 
 extractor = DeadliftFeatureExtractor()
+
+
+# =====================================
+# 🏥 運動醫學級圓背偵測函式
+# =====================================
+def detect_rounded_back(landmarks: List, session_id: str):
+    """
+    偵測圓背（脊椎曲率），使用向量夾角法
+    
+    Args:
+        landmarks: 33 個 MediaPipe landmarks
+        session_id: 用戶 session ID（用於追蹤穩定幀數）
+    
+    Returns:
+        dict: 包含脊椎曲率、狀態、訊息等
+    """
+    # 初始化該 session 的狀態
+    if session_id not in user_spine_state:
+        user_spine_state[session_id] = {
+            "smoothed_angle": 0,
+            "warning_frames": 0,
+            "danger_frames": 0
+        }
+    
+    state = user_spine_state[session_id]
+    
+    # 取得關鍵點
+    nose = np.array([landmarks[0].x, landmarks[0].y])
+    left_shoulder = np.array([landmarks[11].x, landmarks[11].y])
+    right_shoulder = np.array([landmarks[12].x, landmarks[12].y])
+    left_hip = np.array([landmarks[23].x, landmarks[23].y])
+    right_hip = np.array([landmarks[24].x, landmarks[24].y])
+    left_knee = np.array([landmarks[25].x, landmarks[25].y])
+    right_knee = np.array([landmarks[26].x, landmarks[26].y])
+    
+    # 計算中點
+    mid_shoulder = (left_shoulder + right_shoulder) / 2
+    mid_hip = (left_hip + right_hip) / 2
+    mid_knee = (left_knee + right_knee) / 2
+    
+    # 計算向量
+    # 上段脊椎向量：mid_shoulder → nose
+    upper_spine = nose - mid_shoulder
+    # 下段脊椎向量：mid_hip → mid_shoulder
+    lower_spine = mid_shoulder - mid_hip
+    
+    # 計算脊椎曲率角度（兩向量夾角）
+    dot = np.dot(upper_spine, lower_spine)
+    mag1 = np.linalg.norm(upper_spine)
+    mag2 = np.linalg.norm(lower_spine)
+    
+    raw_curvature_angle = 0.0
+    if mag1 * mag2 > 0:
+        cos_angle = np.clip(dot / (mag1 * mag2), -1.0, 1.0)
+        raw_curvature_angle = np.degrees(np.arccos(cos_angle))
+    
+    # 角度平滑處理
+    alpha = STABILITY_CONFIG["smoothing_factor"]
+    state["smoothed_angle"] = alpha * raw_curvature_angle + (1 - alpha) * state["smoothed_angle"]
+    spine_curvature = state["smoothed_angle"]
+    
+    # 計算髖部角度（判斷是否正在做硬舉）
+    shoulder_vec = mid_shoulder - mid_hip
+    knee_vec = mid_knee - mid_hip
+    dot_hip = np.dot(shoulder_vec, knee_vec)
+    mag_s = np.linalg.norm(shoulder_vec)
+    mag_k = np.linalg.norm(knee_vec)
+    hip_angle = 180.0
+    if mag_s * mag_k > 0:
+        cos_hip = np.clip(dot_hip / (mag_s * mag_k), -1.0, 1.0)
+        hip_angle = np.degrees(np.arccos(cos_hip))
+    
+    is_lifting = hip_angle < DEADLIFT_DETECTION["hip_angle_threshold"]
+    
+    # 時間穩定機制：連續幀數判斷
+    status = "safe"
+    message = "✅ 脊椎中立，姿勢良好"
+    is_rounded = False
+    confirmed_status = "safe"
+    
+    if is_lifting:
+        # 更新連續超標幀數
+        if spine_curvature > SPINE_THRESHOLDS["danger"]:
+            state["danger_frames"] += 1
+            state["warning_frames"] += 1
+        elif spine_curvature > SPINE_THRESHOLDS["warning"]:
+            state["danger_frames"] = 0
+            state["warning_frames"] += 1
+        elif spine_curvature > SPINE_THRESHOLDS["safe"]:
+            state["danger_frames"] = 0
+            state["warning_frames"] += 1
+        else:
+            state["danger_frames"] = 0
+            state["warning_frames"] = 0
+        
+        frame_threshold = STABILITY_CONFIG["frame_threshold"]
+        
+        if spine_curvature > SPINE_THRESHOLDS["critical"]:
+            confirmed_status = "critical"
+            status = "critical"
+            message = f"🚨 嚴重圓背 {spine_curvature:.0f}°！立即停止！"
+            is_rounded = True
+        elif state["danger_frames"] >= frame_threshold and spine_curvature > SPINE_THRESHOLDS["danger"]:
+            confirmed_status = "danger"
+            status = "danger"
+            message = f"🔴 圓背警告！曲率 {spine_curvature:.0f}°，請挺直背部"
+            is_rounded = True
+        elif state["warning_frames"] >= frame_threshold and spine_curvature > SPINE_THRESHOLDS["warning"]:
+            confirmed_status = "warning"
+            status = "warning"
+            message = f"⚠️ 注意：脊椎輕微彎曲 {spine_curvature:.0f}°"
+            is_rounded = False
+        elif spine_curvature > SPINE_THRESHOLDS["safe"]:
+            status = "monitoring"
+            message = f"👀 監測中... {spine_curvature:.0f}°"
+            is_rounded = False
+    else:
+        # 未做硬舉時重置計數器
+        state["warning_frames"] = 0
+        state["danger_frames"] = 0
+        message = "準備就緒，請開始動作"
+    
+    return {
+        "spine_curvature": float(round(spine_curvature, 1)),
+        "raw_angle": float(round(raw_curvature_angle, 1)),
+        "status": status,
+        "confirmed_status": confirmed_status,
+        "message": message,
+        "is_rounded": bool(is_rounded),
+        "is_lifting": bool(is_lifting),
+        "hip_angle": float(round(hip_angle, 1)),
+        "warning_frames": int(state["warning_frames"]),
+        "danger_frames": int(state["danger_frames"])
+    }
 
 
 def init_pose():
@@ -280,76 +439,102 @@ else:
 
 
 # ================================================================
-# 🤖 ML 預測端點：30 幀滑動窗口 + Random Forest 分類
+# 🤖 ML 預測端點：30 幀滑動窗口 + Random Forest 分類 + 圓背偵測
 # ================================================================
 @app.post("/predict")
 def predict(data: FrameData):
     """
-    接收前端 MediaPipe 33 landmarks，累積 30 幀後進行 ML 推論
+    接收前端 MediaPipe 33 landmarks，進行即時圓背偵測 + ML 推論
     回傳格式：
-    - A: 偵測到的姿勢問題標籤列表
+    - A: 偵測到的姿勢問題標籤列表（ML 模型）
     - D: 是否成功
     - E: 錯誤訊息（如有）
+    - spine: 圓背偵測結果（即時）
     """
-    # 嘗試載入 ML 模型
-    if not init_ml_model():
-        return {"A": [], "D": False, "E": "MLModelNotLoaded"}
-    
     session = data.session_id
-
-    # 初始化 window
-    if session not in user_windows:
-        user_windows[session] = deque(maxlen=30)
-
-    # Mediapipe 33 landmark → 取出所需 index
-    required_idx = {
-        "left_ear": 7,
-        "left_shoulder": 11, "right_shoulder": 12,
-        "left_hip": 23, "right_hip": 24,
-        "left_knee": 25, "right_knee": 26,
-        "left_ankle": 27, "right_ankle": 28,
-        "left_wrist": 15, "right_wrist": 16
-    }
-
+    
+    # ========================
+    # 🏥 即時圓背偵測（每幀都執行）
+    # ========================
+    spine_result = None
     try:
-        lm = {
-            key: np.array([
-                data.landmarks[idx].x,
-                data.landmarks[idx].y,
-            ])
-            for key, idx in required_idx.items()
+        spine_result = detect_rounded_back(data.landmarks, session)
+    except Exception as e:
+        print(f"⚠️ Spine detection error: {e}")
+        spine_result = {
+            "spine_curvature": 0,
+            "status": "error",
+            "confirmed_status": "error",
+            "message": "偵測錯誤",
+            "is_rounded": False,
+            "is_lifting": False,
+            "hip_angle": 180,
+            "warning_frames": 0,
+            "danger_frames": 0
         }
-    except Exception:
-        return {"A": [], "D": False, "E": "LandmarkMissing"}
-
-    # 抽取單一 frame 特徵
-    feats = extractor.extract_frame_features(lm)
-    user_windows[session].append(feats)
-
-    # 如果未滿 30 幀 → 無法預測
-    if len(user_windows[session]) < 30:
-        return {"A": [], "D": True, "E": "InsufficientFrames"}
-
+    
     # ========================
-    # 聚合特徵（與訓練一致）
+    # 🤖 ML 模型預測（需累積 30 幀）
     # ========================
-    window = np.array(user_windows[session])
-    input_vec = np.concatenate([
-        np.mean(window, axis=0),
-        np.max(window, axis=0),
-        np.min(window, axis=0),
-        np.std(window, axis=0)
-    ]).reshape(1, -1)
+    ml_labels = []
+    ml_ready = False
+    
+    # 嘗試載入 ML 模型
+    if init_ml_model():
+        # 初始化 window
+        if session not in user_windows:
+            user_windows[session] = deque(maxlen=30)
 
-    # 模型推論
-    pred = clf.predict(input_vec)
-    labels = mlb.inverse_transform(pred)[0]
+        # Mediapipe 33 landmark → 取出所需 index
+        required_idx = {
+            "left_ear": 7,
+            "left_shoulder": 11, "right_shoulder": 12,
+            "left_hip": 23, "right_hip": 24,
+            "left_knee": 25, "right_knee": 26,
+            "left_ankle": 27, "right_ankle": 28,
+            "left_wrist": 15, "right_wrist": 16
+        }
 
-    # ------------------------
-    # 回傳 A / D / E
-    # ------------------------
+        try:
+            lm = {
+                key: np.array([
+                    data.landmarks[idx].x,
+                    data.landmarks[idx].y,
+                ])
+                for key, idx in required_idx.items()
+            }
+            
+            # 抽取單一 frame 特徵
+            feats = extractor.extract_frame_features(lm)
+            user_windows[session].append(feats)
+
+            # 如果滿 30 幀 → 進行 ML 預測
+            if len(user_windows[session]) >= 30:
+                ml_ready = True
+                window = np.array(user_windows[session])
+                input_vec = np.concatenate([
+                    np.mean(window, axis=0),
+                    np.max(window, axis=0),
+                    np.min(window, axis=0),
+                    np.std(window, axis=0)
+                ]).reshape(1, -1)
+
+                # 模型推論
+                pred = clf.predict(input_vec)
+                ml_labels = list(mlb.inverse_transform(pred)[0])
+        except Exception as e:
+            print(f"⚠️ ML prediction error: {e}")
+    
+    # ========================
+    # 回傳結果
+    # ========================
+    frame_count = len(user_windows.get(session, [])) if session in user_windows else 0
+    
     return {
-        "A": list(labels),
+        "A": ml_labels,                    # ML 偵測到的問題
         "D": True,
-        "E": None
+        "E": None if ml_ready else "InsufficientFrames",
+        "spine": spine_result,             # 🆕 即時圓背偵測結果
+        "ml_ready": ml_ready,              # 🆕 ML 模型是否準備好
+        "ml_frame_count": frame_count      # 🆕 實際已收集的幀數
     }

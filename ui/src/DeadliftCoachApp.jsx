@@ -38,13 +38,18 @@ const DEADLIFT_DETECTION = {
 // 動作階段：STANDING(站立) → DESCENDING(下降) → BOTTOM(最低點) → ASCENDING(上升) → STANDING
 // 完成一次循環 = 1 rep
 const REP_COUNTER_CONFIG = {
-  // 髖部角度閾值（用於判斷動作階段）
-  standingAngle: 165,      // 高於此角度認為站立
+  // 髖部角度閾值（根據實際硬舉動作調整）
+  // 髖部角度 = 肩-髖-膝 的夾角
+  // 站立時約 170-180°，彎腰拿槓時約 90-120°
+  standingAngle: 160,      // 高於此角度認為站立
   bottomAngle: 120,        // 低於此角度認為到達最低點
   
   // 防抖動配置
-  minRepDuration: 800,     // 最短單次動作時間（毫秒），防止誤判
-  stableFrames: 5,         // 需連續 N 幀確認狀態改變
+  minRepDuration: 800,     // 最短單次動作時間（毫秒）
+  stableFrames: 4,         // 需連續 N 幀確認狀態改變
+  
+  // 平滑係數（0-1，越低越平滑但延遲越高）
+  smoothingFactor: 0.4,
   
   // 自動組數配置
   restTimeThreshold: 10000, // 休息超過此時間（毫秒）自動開始新組
@@ -68,6 +73,22 @@ export default function DeadliftCoachApp({ onBack }) {
   const [spineStatus, setSpineStatus] = useState({ status: 'safe', message: '準備就緒', isRounded: false })
   const [isDoingDeadlift, setIsDoingDeadlift] = useState(false)
   
+  // ============================================
+  // 🎛️ 分析模式選擇
+  // ============================================
+  // 'realtime' = 只用即時計算（前端）
+  // 'ai' = 只用 AI 分析（後端 ML）
+  // 'combined' = 兩者互補（預設）
+  const [analysisMode, setAnalysisMode] = useState('combined');
+  
+  // ============================================
+  // 🤖 ML 模型狀態
+  // ============================================
+  const [mlLabels, setMlLabels] = useState([]);           // ML 偵測到的問題標籤
+  const [mlReady, setMlReady] = useState(false);          // ML 是否準備好（30幀收集完成）
+  const [mlFrameCount, setMlFrameCount] = useState(0);    // 已收集的幀數
+  const [combinedWarning, setCombinedWarning] = useState(null); // 整合警告（即時+ML）
+  
   const sessionId = useRef(`session-${Date.now()}`);
   const lastApiCallTime = useRef(0);
   const isFetching = useRef(false);
@@ -80,13 +101,25 @@ export default function DeadliftCoachApp({ onBack }) {
   const smoothedAngle = useRef(0);  // 平滑後的角度
   
   // ============================================
-  // 🔢 硬舉計數器狀態
-  // ============================================
+// 🔢 硬舉計數器狀態
+// ============================================
   const [repCount, setRepCount] = useState(0);           // 當前組次數
   const [setCount, setSetCount] = useState(1);           // 組數
   const [totalReps, setTotalReps] = useState(0);         // 總次數
   const [repPhase, setRepPhase] = useState('STANDING');  // 動作階段
   const [bestReps, setBestReps] = useState(0);           // 最佳組次數
+  const [repProgress, setRepProgress] = useState(0);     // 🆕 動作進度 0-100%
+  const [lastRepFeedback, setLastRepFeedback] = useState(null); // 🆕 上次完成反饋
+  
+  // ============================================
+  // 📏 距離/位置檢測狀態
+  // ============================================
+  const [positionStatus, setPositionStatus] = useState({
+    isReady: false,
+    message: '請站到攝影機前方',
+    details: [],
+    suggestion: null
+  });
   
   // 計數器內部 refs
   const lastRepTime = useRef(Date.now());                // 上次完成 rep 的時間
@@ -126,6 +159,149 @@ export default function DeadliftCoachApp({ onBack }) {
     } catch (e) {
       console.warn('Audio not supported:', e);
     }
+  }, []);
+
+  // ============================================
+  // 📏 距離/位置檢測函式
+  // ============================================
+  const checkPositionAndDistance = useCallback((landmarks) => {
+    // 硬舉需要的關鍵點
+    const keyPoints = {
+      nose: landmarks[0],
+      leftShoulder: landmarks[11],
+      rightShoulder: landmarks[12],
+      leftHip: landmarks[23],
+      rightHip: landmarks[24],
+      leftKnee: landmarks[25],
+      rightKnee: landmarks[26],
+      leftAnkle: landmarks[27],
+      rightAnkle: landmarks[28],
+    };
+    
+    const issues = [];
+    const MIN_VISIBILITY = 0.5;
+    const MARGIN = 0.05; // 邊界容差
+    
+    // 1. 檢查關鍵點可見度
+    const visibilityCheck = {
+      '頭部': keyPoints.nose.visibility > MIN_VISIBILITY,
+      '左肩': keyPoints.leftShoulder.visibility > MIN_VISIBILITY,
+      '右肩': keyPoints.rightShoulder.visibility > MIN_VISIBILITY,
+      '左髖': keyPoints.leftHip.visibility > MIN_VISIBILITY,
+      '右髖': keyPoints.rightHip.visibility > MIN_VISIBILITY,
+      '左膝': keyPoints.leftKnee.visibility > MIN_VISIBILITY,
+      '右膝': keyPoints.rightKnee.visibility > MIN_VISIBILITY,
+      '左踝': keyPoints.leftAnkle.visibility > MIN_VISIBILITY,
+      '右踝': keyPoints.rightAnkle.visibility > MIN_VISIBILITY,
+    };
+    
+    const invisibleParts = Object.entries(visibilityCheck)
+      .filter(([_, visible]) => !visible)
+      .map(([part]) => part);
+    
+    // 2. 檢查是否在畫面範圍內
+    const inFrameCheck = (point, name) => {
+      if (point.x < MARGIN) return { part: name, issue: 'left' };
+      if (point.x > 1 - MARGIN) return { part: name, issue: 'right' };
+      if (point.y < MARGIN) return { part: name, issue: 'top' };
+      if (point.y > 1 - MARGIN) return { part: name, issue: 'bottom' };
+      return null;
+    };
+    
+    const outOfFrame = [
+      inFrameCheck(keyPoints.nose, '頭部'),
+      inFrameCheck(keyPoints.leftShoulder, '左肩'),
+      inFrameCheck(keyPoints.rightShoulder, '右肩'),
+      inFrameCheck(keyPoints.leftAnkle, '左腳'),
+      inFrameCheck(keyPoints.rightAnkle, '右腳'),
+    ].filter(x => x !== null);
+    
+    // 3. 檢查身體大小（距離判斷）
+    const shoulderY = (keyPoints.leftShoulder.y + keyPoints.rightShoulder.y) / 2;
+    const ankleY = (keyPoints.leftAnkle.y + keyPoints.rightAnkle.y) / 2;
+    const bodyHeight = Math.abs(ankleY - shoulderY); // 身體在畫面中的相對高度
+    
+    const shoulderWidth = Math.abs(keyPoints.leftShoulder.x - keyPoints.rightShoulder.x);
+    
+    // 判斷距離
+    let distanceSuggestion = null;
+    let isDistanceOk = true;
+    
+    if (bodyHeight < 0.35) {
+      // 身體太小 = 太遠
+      distanceSuggestion = 'closer';
+      isDistanceOk = false;
+      issues.push('身體太小，請靠近攝影機');
+    } else if (bodyHeight > 0.85) {
+      // 身體太大 = 太近
+      distanceSuggestion = 'farther';
+      isDistanceOk = false;
+      issues.push('身體太大，請遠離攝影機');
+    }
+    
+    // 檢查是否有部位超出畫面
+    if (outOfFrame.length > 0) {
+      const topIssues = outOfFrame.filter(x => x.issue === 'top');
+      const bottomIssues = outOfFrame.filter(x => x.issue === 'bottom');
+      const leftIssues = outOfFrame.filter(x => x.issue === 'left');
+      const rightIssues = outOfFrame.filter(x => x.issue === 'right');
+      
+      if (topIssues.length > 0) {
+        issues.push(`${topIssues.map(x => x.part).join('、')} 超出畫面上方`);
+        if (!distanceSuggestion) distanceSuggestion = 'farther';
+      }
+      if (bottomIssues.length > 0) {
+        issues.push(`${bottomIssues.map(x => x.part).join('、')} 超出畫面下方`);
+        if (!distanceSuggestion) distanceSuggestion = 'farther';
+      }
+      if (leftIssues.length > 0 || rightIssues.length > 0) {
+        issues.push('請站到畫面中央');
+      }
+    }
+    
+    // 檢查不可見的部位
+    if (invisibleParts.length > 0) {
+      issues.push(`無法偵測到：${invisibleParts.join('、')}`);
+      // 如果下半身看不到，可能太近
+      if (invisibleParts.some(p => p.includes('膝') || p.includes('踝'))) {
+        if (!distanceSuggestion) distanceSuggestion = 'farther';
+      }
+      // 如果上半身看不到，可能位置不對
+      if (invisibleParts.some(p => p.includes('肩') || p.includes('頭'))) {
+        if (!distanceSuggestion) distanceSuggestion = 'adjust';
+      }
+    }
+    
+    // 綜合判斷
+    const isReady = issues.length === 0 && isDistanceOk;
+    
+    let message = '✅ 位置完美！可以開始';
+    let suggestion = null;
+    
+    if (!isReady) {
+      if (distanceSuggestion === 'closer') {
+        message = '📏 請靠近攝影機一點';
+        suggestion = '👉 往前走一步';
+      } else if (distanceSuggestion === 'farther') {
+        message = '📏 請遠離攝影機一點';
+        suggestion = '👈 往後退一步';
+      } else if (distanceSuggestion === 'adjust') {
+        message = '📏 請調整站位';
+        suggestion = '確保全身都在畫面中';
+      } else {
+        message = '⚠️ 請調整位置';
+        suggestion = issues[0];
+      }
+    }
+    
+    return {
+      isReady,
+      message,
+      details: issues,
+      suggestion,
+      bodyHeight: (bodyHeight * 100).toFixed(0),
+      shoulderWidth: (shoulderWidth * 100).toFixed(0)
+    };
   }, []);
 
   // ============================================
@@ -252,15 +428,26 @@ export default function DeadliftCoachApp({ onBack }) {
   }, []);
 
   // ============================================
-  // 🔢 硬舉計數器邏輯
+  // 🔢 硬舉計數器邏輯（優化版）
   // ============================================
   const updateRepCounter = useCallback((hipAngle) => {
     const now = Date.now();
     
-    // 髖部角度平滑處理
-    const α = 0.3;
+    // 髖部角度平滑處理（使用配置中的係數）
+    const α = REP_COUNTER_CONFIG.smoothingFactor;
     smoothedHipAngle.current = α * hipAngle + (1 - α) * smoothedHipAngle.current;
     const smoothHip = smoothedHipAngle.current;
+    
+    // 📊 計算動作進度（用於即時回饋）
+    const standAngle = REP_COUNTER_CONFIG.standingAngle;
+    const bottomAngle = REP_COUNTER_CONFIG.bottomAngle;
+    const angleRange = standAngle - bottomAngle;
+    
+    // 進度 0% = 站立，100% = 最低點
+    let progress = 0;
+    if (smoothHip < standAngle) {
+      progress = Math.min(100, Math.max(0, (standAngle - smoothHip) / angleRange * 100));
+    }
     
     // 判斷目標階段
     let targetPhase = currentPhase.current;
@@ -296,6 +483,11 @@ export default function DeadliftCoachApp({ onBack }) {
               const newCount = prev + 1;
               // 更新最佳記錄
               setBestReps(best => Math.max(best, newCount));
+              
+              // 🆕 觸發完成反饋動畫
+              setLastRepFeedback({ count: newCount, time: now });
+              setTimeout(() => setLastRepFeedback(null), 1500);
+              
               return newCount;
             });
             setTotalReps(prev => prev + 1);
@@ -305,12 +497,20 @@ export default function DeadliftCoachApp({ onBack }) {
           }
         }
         
+        // 🆕 到達最低點時播放提示音
+        if (targetPhase === 'BOTTOM') {
+          playPhaseSound('bottom');
+        }
+        
         setRepPhase(targetPhase);
         lastActivityTime.current = now;
       }
     } else {
       phaseStableFrames.current = 0;
     }
+    
+    // 🆕 即時更新進度
+    setRepProgress(progress);
     
     // 自動檢測組間休息（長時間站立 = 新組）
     if (currentPhase.current === 'STANDING' && repCount > 0) {
@@ -327,7 +527,9 @@ export default function DeadliftCoachApp({ onBack }) {
     return {
       phase: currentPhase.current,
       smoothedAngle: smoothHip,
-      isActive: currentPhase.current !== 'STANDING'
+      isActive: currentPhase.current !== 'STANDING',
+      progress: progress,  // 新增：動作進度 0-100%
+      rawAngle: hipAngle   // 新增：原始角度
     };
   }, [repCount]);
 
@@ -340,19 +542,56 @@ export default function DeadliftCoachApp({ onBack }) {
         audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
       }
       const ctx = audioContextRef.current;
+      
+      // 播放兩個音符的和弦（更明顯的成功感）
+      [523.25, 659.25].forEach((freq, i) => {
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.frequency.value = freq;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.25, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+        
+        oscillator.start(ctx.currentTime + i * 0.05);
+        oscillator.stop(ctx.currentTime + 0.25);
+      });
+    } catch (e) {
+      console.warn('Audio not supported:', e);
+    }
+  }, []);
+
+  // ============================================
+  // 🔊 播放階段提示音
+  // ============================================
+  const playPhaseSound = useCallback((phase) => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const ctx = audioContextRef.current;
       const oscillator = ctx.createOscillator();
       const gainNode = ctx.createGain();
       
       oscillator.connect(gainNode);
       gainNode.connect(ctx.destination);
-      oscillator.frequency.value = 523.25; // C5 音符
-      oscillator.type = 'sine';
       
-      gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      // 不同階段不同音調
+      if (phase === 'bottom') {
+        oscillator.frequency.value = 392; // G4 - 到達底部
+      } else {
+        oscillator.frequency.value = 440; // A4 - 其他
+      }
+      oscillator.type = 'triangle';
+      
+      gainNode.gain.setValueAtTime(0.15, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
       
       oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + 0.15);
+      oscillator.stop(ctx.currentTime + 0.1);
     } catch (e) {
       console.warn('Audio not supported:', e);
     }
@@ -367,6 +606,7 @@ export default function DeadliftCoachApp({ onBack }) {
     setTotalReps(0);
     setBestReps(0);
     setRepPhase('STANDING');
+    setRepProgress(0);
     repHistory.current = [];
     lastRepTime.current = Date.now();
     lastActivityTime.current = Date.now();
@@ -453,6 +693,10 @@ export default function DeadliftCoachApp({ onBack }) {
     const kneeAngle = calcAngle(hip, knee, ankle);
     const hipAngle = calcAngle(shoulder, hip, knee);
     
+    // 📏 檢測位置和距離是否適當
+    const posResult = checkPositionAndDistance(landmarks);
+    setPositionStatus(posResult);
+    
     // 3. 偵測是否正在做硬舉（先判斷，再傳給圓背偵測）
     const isLifting = hipAngle < DEADLIFT_DETECTION.hipAngleThreshold;
     setIsDoingDeadlift(isLifting);
@@ -494,8 +738,12 @@ export default function DeadliftCoachApp({ onBack }) {
     // 7. 繪製骨架
     drawSkeleton(kps, newAngles, spineResult, isLifting);
 
-    // 8. 呼叫後端 API
+    // 8. 呼叫後端 API 進行圓背偵測和 ML 分析
+    // 'realtime' 模式下跳過後端 API 呼叫
+    if (analysisMode === 'realtime') return;
+    
     const now = Date.now();
+    // 🔧 優化：提高 API 呼叫頻率到 100ms，因為圓背偵測需要即時反饋
     if (now - lastApiCallTime.current > 100 && !isFetching.current) {
       lastApiCallTime.current = now;
       isFetching.current = true;
@@ -515,17 +763,98 @@ export default function DeadliftCoachApp({ onBack }) {
         throw new Error("Network response was not ok.");
       })
       .then(data => {
-        if (data.E === "InsufficientFrames") {
-          setFeedback({ text: "累積數據中...", level: "ok" });
-        } else if (data.A && data.A.length > 0) {
-          setFeedback({ text: data.A.join(", "), level: "warn" });
-        } else if (data.D) {
-          setFeedback({ text: "姿勢良好", level: "ok" });
+        // 🏥 使用後端的圓背偵測結果
+        if (data.spine) {
+          const backendSpine = data.spine;
+          setSpineStatus({
+            status: backendSpine.status,
+            confirmedStatus: backendSpine.confirmed_status,
+            message: backendSpine.message,
+            isRounded: backendSpine.is_rounded,
+            spineCurvature: backendSpine.spine_curvature,
+            warningFrames: backendSpine.warning_frames,
+            dangerFrames: backendSpine.danger_frames
+          });
+          
+          // 更新角度（使用後端計算的值）
+          setAngles(prev => ({
+            ...prev,
+            spineCurvature: backendSpine.spine_curvature,
+            hip: backendSpine.hip_angle
+          }));
+          
+          // 更新是否正在做硬舉
+          setIsDoingDeadlift(backendSpine.is_lifting);
+          
+          // 播放警告音效（只在確認狀態為危險時播放）
+          if (backendSpine.is_lifting && 
+              (backendSpine.confirmed_status === 'critical' || backendSpine.confirmed_status === 'danger')) {
+            playWarningSound(backendSpine.confirmed_status);
+          }
+        }
+        
+        // ============================================
+        // 🤖 ML 模型結果處理
+        // ============================================
+        setMlReady(data.ml_ready || false);
+        
+        // 🔧 使用後端回傳的實際幀數
+        if (data.ml_frame_count !== undefined) {
+          setMlFrameCount(data.ml_frame_count);
+        } else if (!data.ml_ready) {
+          // 後備：如果後端沒回傳，才用前端估算
+          setMlFrameCount(prev => Math.min(prev + 1, 29));
+        } else {
+          setMlFrameCount(30);
+        }
+        
+        if (data.ml_ready && data.A) {
+          setMlLabels(data.A);
+          
+          // 🎯 整合警告邏輯：即時偵測 + ML 確認
+          const spineWarning = data.spine?.is_rounded;
+          const mlHasRoundedBack = data.A.includes('rounded_back');
+          
+          if (spineWarning && mlHasRoundedBack) {
+            // 雙重確認：即時 + ML 都偵測到 → 強烈警告
+            setCombinedWarning({
+              level: 'critical',
+              message: '🚨 AI 確認：圓背姿勢！請立即調整',
+              source: 'both'
+            });
+          } else if (mlHasRoundedBack) {
+            // 只有 ML 偵測到 → 中度警告
+            setCombinedWarning({
+              level: 'ml-warning',
+              message: '🤖 AI 分析：偵測到圓背傾向',
+              source: 'ml'
+            });
+          } else if (spineWarning) {
+            // 只有即時偵測 → 輕度警告（可能誤報）
+            setCombinedWarning({
+              level: 'realtime-warning',
+              message: '⚠️ 注意背部姿勢（待 AI 確認）',
+              source: 'realtime'
+            });
+          } else if (data.A.length > 0) {
+            // ML 偵測到其他問題
+            setCombinedWarning({
+              level: 'info',
+              message: `🤖 AI 建議：${data.A.join('、')}`,
+              source: 'ml'
+            });
+          } else {
+            // 一切正常
+            setCombinedWarning(null);
+          }
+        } else if (!data.ml_ready) {
+          // ML 尚未準備好
+          setCombinedWarning(null);
         }
       })
       .catch(err => {
-        console.error("API Error", err);
-        setFeedback({ text: "連線異常", level: "warn" });
+        // API 失敗時回退到前端計算（已在上面完成）
+        console.warn("API Error, using frontend fallback:", err.message);
       })
       .finally(() => {
         isFetching.current = false;
@@ -684,21 +1013,75 @@ export default function DeadliftCoachApp({ onBack }) {
       </button>
       <h1 className="app-title">AI 硬舉姿勢分析系統</h1>
       
-      {/* 動作狀態指示 */}
-      <div className={`action-status-badge ${isDoingDeadlift ? 'active' : 'standby'}`}>
-        {isDoingDeadlift ? '🏋️ 硬舉中' : '🧍 準備中'}
+      {/* 📏 位置/距離檢測提示 - 最上方顯示 */}
+      <PositionIndicator positionStatus={positionStatus} />
+      
+      {/* 🆕 分析模式選擇器 */}
+      <div className="analysis-mode-selector">
+        <div className="mode-label">分析模式：</div>
+        <div className="mode-buttons">
+          <button 
+            className={`mode-btn ${analysisMode === 'realtime' ? 'active' : ''}`}
+            onClick={() => setAnalysisMode('realtime')}
+            title="只使用前端即時計算，不需網路連線"
+          >
+            ⚡ 即時
+          </button>
+          <button 
+            className={`mode-btn ${analysisMode === 'ai' ? 'active' : ''}`}
+            onClick={() => setAnalysisMode('ai')}
+            title="只使用後端 AI 機器學習模型分析"
+          >
+            🤖 AI
+          </button>
+          <button 
+            className={`mode-btn ${analysisMode === 'combined' ? 'active' : ''}`}
+            onClick={() => setAnalysisMode('combined')}
+            title="結合即時計算 + AI 模型，提供最完整的分析"
+          >
+            🔗 組合
+          </button>
+        </div>
       </div>
       
-      {/* 🔢 大型計數器顯示（視頻左上角） */}
-      <div className="rep-counter-overlay">
+      {/* 動作狀態指示 */}
+      <div className="status-bar">
+        <div className={`action-status-badge ${isDoingDeadlift ? 'active' : 'standby'}`}>
+          {isDoingDeadlift ? '🏋️ 硬舉中' : '🧍 準備中'}
+        </div>
+      </div>
+      
+      {/* 🔢 大型計數器顯示（視頻左上角）- 優化版 */}
+      <div className={`rep-counter-overlay ${lastRepFeedback ? 'rep-success' : ''}`}>
+        {/* 完成動作的慶祝動畫 */}
+        {lastRepFeedback && (
+          <div className="rep-celebration">
+            <span className="celebration-text">+1</span>
+          </div>
+        )}
+        
         <div className="rep-count-big">{repCount}</div>
         <div className="rep-count-label">REPS</div>
+        
+        {/* 動作進度條 */}
+        <div className="rep-progress-container">
+          <div className="rep-progress-bar">
+            <div 
+              className={`rep-progress-fill ${repPhase.toLowerCase()}`}
+              style={{ width: `${repProgress}%` }}
+            />
+          </div>
+          <div className="rep-progress-text">
+            {repProgress > 0 ? `${Math.round(repProgress)}%` : '準備'}
+          </div>
+        </div>
+        
         <div className="phase-indicator">
           <span className={`phase-dot ${repPhase.toLowerCase()}`}></span>
           {repPhase === 'STANDING' && '站立'}
-          {repPhase === 'DESCENDING' && '下降中'}
-          {repPhase === 'BOTTOM' && '最低點'}
-          {repPhase === 'ASCENDING' && '上升中'}
+          {repPhase === 'DESCENDING' && '⬇️ 下降中'}
+          {repPhase === 'BOTTOM' && '⏬ 最低點'}
+          {repPhase === 'ASCENDING' && '⬆️ 上升中'}
         </div>
       </div>
       
@@ -712,7 +1095,13 @@ export default function DeadliftCoachApp({ onBack }) {
             <h3>量化分析儀表板</h3>
             <div className="card-grid">
               <Card title="膝蓋角度" value={angles.knee} unit="°" />
-              <Card title="髖部角度" value={angles.hip} unit="°" />
+              <Card 
+                title="髖部角度" 
+                value={angles.hip} 
+                unit="°"
+                highlight={angles.hip <= REP_COUNTER_CONFIG.bottomAngle}
+                subtext={`站:>${REP_COUNTER_CONFIG.standingAngle}° 底:<${REP_COUNTER_CONFIG.bottomAngle}°`}
+              />
               <Card 
                 title="脊椎曲率" 
                 value={angles.spineCurvature} 
@@ -733,23 +1122,64 @@ export default function DeadliftCoachApp({ onBack }) {
             totalReps={totalReps}
             bestReps={bestReps}
             repPhase={repPhase}
+            repProgress={repProgress}
             onReset={resetCounter}
             onNewSet={startNewSet}
           />
           
           <div className="feedback-system">
             <h3>智慧回饋系統</h3>
-            <div className={`feedback-box ${
-              isDoingDeadlift && spineStatus.confirmedStatus === 'critical' ? 'feedback-critical' :
-              isDoingDeadlift && spineStatus.confirmedStatus === 'danger' ? 'feedback-error' :
-              isDoingDeadlift && spineStatus.status === 'warning' ? 'feedback-warning' :
-              isDoingDeadlift && spineStatus.status === 'monitoring' ? 'feedback-monitoring' :
-              'feedback-good'
-            }`}>
-              {isDoingDeadlift && (spineStatus.confirmedStatus === 'critical' || spineStatus.confirmedStatus === 'danger') && <span className="warning-icon">⚠️</span>}
-              {isDoingDeadlift ? spineStatus.message : '準備就緒，請開始動作'}
-            </div>
+            
+            {/* 根據分析模式顯示不同的回饋內容 */}
+            {analysisMode === 'ai' ? (
+              // AI 模式：只顯示 ML 分析結果
+              <div className="feedback-box feedback-ai-mode">
+                <span className="mode-indicator">🤖 AI 分析模式</span>
+                {mlReady ? (
+                  mlLabels.length > 0 ? (
+                    <div className="ai-only-feedback">
+                      <span className="warning-icon">⚠️</span>
+                      AI 偵測到：{mlLabels.join('、')}
+                    </div>
+                  ) : (
+                    <div className="ai-only-feedback good">
+                      ✅ AI 分析：姿勢正確
+                    </div>
+                  )
+                ) : (
+                  <div className="ai-only-feedback loading">
+                    ⏳ AI 正在學習中... ({mlFrameCount}/30 幀)
+                  </div>
+                )}
+              </div>
+            ) : (
+              // 即時模式或組合模式：顯示即時回饋
+              <div className={`feedback-box ${
+                isDoingDeadlift && spineStatus.confirmedStatus === 'critical' ? 'feedback-critical' :
+                isDoingDeadlift && spineStatus.confirmedStatus === 'danger' ? 'feedback-error' :
+                isDoingDeadlift && spineStatus.status === 'warning' ? 'feedback-warning' :
+                isDoingDeadlift && spineStatus.status === 'monitoring' ? 'feedback-monitoring' :
+                'feedback-good'
+              }`}>
+                {analysisMode === 'realtime' && (
+                  <span className="mode-indicator">⚡ 即時分析模式</span>
+                )}
+                {isDoingDeadlift && (spineStatus.confirmedStatus === 'critical' || spineStatus.confirmedStatus === 'danger') && <span className="warning-icon">⚠️</span>}
+                {isDoingDeadlift ? spineStatus.message : '準備就緒，請開始動作'}
+              </div>
+            )}
           </div>
+          
+          {/* 🆕 🤖 ML 分析結果面板 - 只在 AI 或組合模式下顯示 */}
+          {analysisMode !== 'realtime' && (
+            <MlResultPanel 
+              mlReady={mlReady}
+              mlLabels={mlLabels}
+              mlFrameCount={mlFrameCount}
+              combinedWarning={combinedWarning}
+              showCombinedWarning={analysisMode === 'combined'}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -831,15 +1261,15 @@ const SpineStatusIndicator = ({ status, isActive }) => {
 };
 
 // ============================================
-// 🔢 組件：硬舉計數器
+// 🔢 組件：硬舉計數器（優化版）
 // ============================================
-const RepCounter = ({ repCount, setCount, totalReps, bestReps, repPhase, onReset, onNewSet }) => {
+const RepCounter = ({ repCount, setCount, totalReps, bestReps, repPhase, repProgress, onReset, onNewSet }) => {
   const getPhaseInfo = () => {
     switch (repPhase) {
       case 'STANDING': return { icon: '🧍', text: '站立準備', color: '#4CAF50' };
-      case 'DESCENDING': return { icon: '⬇️', text: '下降階段', color: '#FF9800' };
-      case 'BOTTOM': return { icon: '⏬', text: '最低位置', color: '#2196F3' };
-      case 'ASCENDING': return { icon: '⬆️', text: '上升階段', color: '#9C27B0' };
+      case 'DESCENDING': return { icon: '⬇️', text: '下降中...', color: '#FF9800' };
+      case 'BOTTOM': return { icon: '⏬', text: '到達底部！', color: '#2196F3' };
+      case 'ASCENDING': return { icon: '⬆️', text: '上升中...', color: '#9C27B0' };
       default: return { icon: '🔄', text: '偵測中', color: '#757575' };
     }
   };
@@ -882,10 +1312,151 @@ const RepCounter = ({ repCount, setCount, totalReps, bestReps, repPhase, onReset
         </div>
       </div>
       
-      <div className="phase-status" style={{ borderColor: phaseInfo.color }}>
+      {/* 🆕 即時進度條 */}
+      <div className="rep-progress-section">
+        <div className="progress-header">
+          <span>動作進度</span>
+          <span className="progress-percent">{Math.round(repProgress || 0)}%</span>
+        </div>
+        <div className="progress-track">
+          <div 
+            className={`progress-fill ${repPhase.toLowerCase()}`}
+            style={{ width: `${repProgress || 0}%` }}
+          />
+        </div>
+      </div>
+      
+      <div className="phase-status" style={{ borderColor: phaseInfo.color, backgroundColor: `${phaseInfo.color}15` }}>
         <span className="phase-icon">{phaseInfo.icon}</span>
         <span className="phase-text" style={{ color: phaseInfo.color }}>{phaseInfo.text}</span>
       </div>
+    </div>
+  );
+};
+
+// ============================================
+// 🤖 組件：ML 分析結果面板
+// ============================================
+const ML_LABEL_TRANSLATIONS = {
+  'rounded_back': '🔴 圓背',
+  'early_hip_drive': '⚠️ 過早伸髖',
+  'knee_cave': '⚠️ 膝蓋內夾',
+  'good_form': '✅ 姿勢良好',
+  'lockout_incomplete': '⚠️ 鎖定不完全',
+  'bar_drift': '⚠️ 槓鈴偏移',
+  'hyperextension': '⚠️ 過度後仰',
+  // 添加更多標籤翻譯...
+};
+
+const MlResultPanel = ({ mlReady, mlLabels, mlFrameCount, combinedWarning, showCombinedWarning = true }) => {
+  const translateLabel = (label) => {
+    return ML_LABEL_TRANSLATIONS[label] || label;
+  };
+  
+  const getWarningClass = () => {
+    if (!combinedWarning) return '';
+    switch (combinedWarning.level) {
+      case 'critical': return 'ml-warning-critical';
+      case 'ml-warning': return 'ml-warning-medium';
+      case 'realtime-warning': return 'ml-warning-light';
+      case 'info': return 'ml-warning-info';
+      default: return '';
+    }
+  };
+
+  return (
+    <div className="ml-result-panel">
+      <div className="ml-panel-header">
+        <span className="ml-panel-title">🤖 AI 分析</span>
+        <span className={`ml-status-badge ${mlReady ? 'ready' : 'loading'}`}>
+          {mlReady ? '✅ 就緒' : `⏳ ${mlFrameCount}/30`}
+        </span>
+      </div>
+      
+      {/* ML 進度條 */}
+      {!mlReady && (
+        <div className="ml-progress-container">
+          <div className="ml-progress-bar">
+            <div 
+              className="ml-progress-fill"
+              style={{ width: `${(mlFrameCount / 30) * 100}%` }}
+            />
+          </div>
+          <span className="ml-progress-text">收集數據中...</span>
+        </div>
+      )}
+      
+      {/* 整合警告 - 只在組合模式下顯示 */}
+      {showCombinedWarning && combinedWarning && (
+        <div className={`ml-combined-warning ${getWarningClass()}`}>
+          <span className="warning-message">{combinedWarning.message}</span>
+          {combinedWarning.source === 'both' && (
+            <span className="warning-badge double-confirm">雙重確認</span>
+          )}
+        </div>
+      )}
+      
+      {/* ML 標籤列表 */}
+      {mlReady && mlLabels.length > 0 && (
+        <div className="ml-labels-container">
+          <div className="ml-labels-title">偵測到的問題：</div>
+          <div className="ml-labels-list">
+            {mlLabels.map((label, idx) => (
+              <span 
+                key={idx} 
+                className={`ml-label-tag ${label === 'good_form' ? 'good' : 'warning'}`}
+              >
+                {translateLabel(label)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* 無問題顯示 */}
+      {mlReady && mlLabels.length === 0 && (
+        <div className="ml-no-issues">
+          <span className="no-issues-icon">✅</span>
+          <span className="no-issues-text">AI 分析：姿勢良好</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// 📏 組件：位置/距離檢測指示器
+// ============================================
+const PositionIndicator = ({ positionStatus }) => {
+  if (!positionStatus) return null;
+  
+  const { isReady, message, suggestion, details, bodyHeight, shoulderWidth } = positionStatus;
+  
+  return (
+    <div className={`position-indicator ${isReady ? 'ready' : 'not-ready'}`}>
+      <div className="position-main">
+        <span className={`position-icon ${isReady ? 'ready' : 'warning'}`}>
+          {isReady ? '✅' : '📏'}
+        </span>
+        <span className="position-message">{message}</span>
+      </div>
+      
+      {!isReady && suggestion && (
+        <div className="position-suggestion">
+          <span className="suggestion-arrow">
+            {suggestion.includes('前') ? '👉' : suggestion.includes('後') ? '👈' : '📍'}
+          </span>
+          <span className="suggestion-text">{suggestion}</span>
+        </div>
+      )}
+      
+      {/* 調試資訊 - 可選顯示 */}
+      {bodyHeight && (
+        <div className="position-debug">
+          <span>身高佔比: {bodyHeight}%</span>
+          <span className="debug-hint">(理想: 35-85%)</span>
+        </div>
+      )}
     </div>
   );
 };
