@@ -344,6 +344,15 @@ STANDING (站立, >160°) → DESCENDING (下降) → BOTTOM (最低點, <120°)
 
 ### ☁️ 雲端部署
 
+#### 🌐 線上 Demo
+
+| 服務 | 網址 |
+|------|------|
+| **Frontend** | https://cloudfinal-ui.onrender.com |
+| **Backend API** | https://cloudfinal-backend.onrender.com |
+
+> ⚠️ 免費方案會在 15 分鐘無流量後休眠，首次訪問需等待 ~30 秒喚醒
+
 #### Render 部署
 
 專案已配置 `render.yaml`，支援一鍵部署：
@@ -352,12 +361,13 @@ STANDING (站立, >160°) → DESCENDING (下降) → BOTTOM (最低點, <120°)
 2. 在 [Render Dashboard](https://dashboard.render.com) 建立服務
 3. 選擇「Blueprint」連結 GitHub repository
 4. 系統會自動讀取 `render.yaml` 配置
+5. 手動建立 Static Site（前端）
 
 #### 環境變數
 
 ```env
 # Frontend (ui service)
-VITE_API_BASE=https://your-backend.onrender.com
+VITE_API_BASE=https://cloudfinal-backend.onrender.com
 
 # Backend (pose_backend service)
 PORT=8000
