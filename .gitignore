@@ -1,0 +1,143 @@
+# =====================================
+# 🐍 Python
+# =====================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# uv
+.uv/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# =====================================
+# 📦 Node.js (ui/)
+# =====================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Build outputs
+dist/
+dist-ssr/
+.vite/
+*.local
+
+# =====================================
+# 🎬 影片與大型資料檔案
+# =====================================
+# 影片檔案（太大不應該進版控）
+*.mp4
+*.webm
+*.avi
+*.mov
+*.mkv
+
+# 原始資料夾（使用 data/.gitignore 控制）
+data/raw_videos/
+data/cleaned_videos/*.mp4
+data/cleaned_videos/*.webm
+data/cleaned_videos/*.csv
+
+# 舊資料夾
+dead lift data/
+
+# =====================================
+# 🔐 環境變數與機密
+# =====================================
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+*.pem
+*.key
+secrets/
+
+# =====================================
+# 💻 IDE 與編輯器
+# =====================================
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# =====================================
+# 🖥️ 系統檔案
+# =====================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# =====================================
+# 📊 測試與覆蓋率
+# =====================================
+coverage/
+.nyc_output/
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# =====================================
+# 🐳 Docker
+# =====================================
+*.log
+docker-compose.override.yml
+
+# =====================================
+# 📝 雜項
+# =====================================
+*.bak
+*.tmp
+*.temp
+Todo.md
+TODO.md
+new30.csv
