@@ -12,12 +12,19 @@ from sklearn.preprocessing import MultiLabelBinarizer
 # ==========================================
 # 設定
 # ==========================================
-CSV_PATH = 'new30.csv'
+CSV_PATH = 'all_vidio.csv'
 VIDEO_FOLDER = 'dead lift data'
 URL_COL = 'video_url'
-LABEL_COL = 'labels'
+LABEL_COL = 'label'
 
 MIN_SUCCESS_RATIO = 0.20     # 至少 20% 幀成功才算有效影片
+
+
+# ==========================================
+# 判斷是否為 Bilibili 影片 ID（以 BV 開頭）
+# ==========================================
+def is_bilibili_id(value):
+    return str(value).startswith('BV')
 
 
 # ==========================================
@@ -99,17 +106,51 @@ class DeadliftFeatureExtractor:
     # ==================================================
     # [修改重點] 優化後的特徵提取 (正規化 + 完整特徵)
     # ==================================================
-    def extract_features(self, video_path):
+    def extract_features(self, video_path, start_sec=None, end_sec=None):
         if not os.path.exists(video_path):
             return None, "VideoNotFound"
 
         cap = cv2.VideoCapture(video_path)
+        
+        # 取得影片基本資訊
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if fps <= 0:
+            fps = 30  # 預設 FPS
+        
+        # 計算起始和結束幀
+        start_frame = 0
+        end_frame = total_frames
+        
+        if start_sec is not None:
+            start_frame = int(float(start_sec) * fps)
+        
+        if end_sec is not None:
+            end_frame = int(float(end_sec) * fps)
+        
+        # 確保範圍有效
+        start_frame = max(0, start_frame)
+        end_frame = min(total_frames, end_frame)
+        
+        # 跳轉到起始幀
+        if start_frame > 0:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+        
         valid_frames = []
+        current_frame = start_frame
+        
+        print(f"   [Debug] FPS={fps:.2f}, 總幀數={total_frames}, 處理範圍={start_frame}~{end_frame}")
         
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
+            
+            # 檢查是否超過結束幀
+            if current_frame >= end_frame:
+                break
+            
+            current_frame += 1
 
             # 影像處理
             try:
@@ -189,20 +230,35 @@ if __name__ == "__main__":
     X, y_raw = [], []
 
     for idx, row in df.iterrows():
-        vid = parse_youtube_id(row[URL_COL])
-        print(f"\n[{idx+1}/{len(df)}] ID = {vid}")
+        video_url = row[URL_COL]
+        
+        # 判斷是 Bilibili 還是 YouTube
+        if is_bilibili_id(video_url):
+            # Bilibili 格式：使用 start_seconds 和 end_seconds
+            vid = video_url
+            start_sec = row['start_seconds']
+            end_sec = row['end_seconds']
+            video_path = "dead lift data\\BV1z7411z7FK.mp4"
+            print(f"\n[{idx+1}/{len(df)}] [Bilibili] ID = {vid}, 時間範圍 = {start_sec}s ~ {end_sec}s")
+        else:
+            # YouTube 格式：video_url 是 URL，維持原本邏輯
+            vid = parse_youtube_id(video_url)
+            start_sec = None
+            end_sec = None
+            video_path = find_video_by_id(vid, VIDEO_FOLDER)
+            print(f"\n[{idx+1}/{len(df)}] [YouTube] ID = {vid}")
 
         if not vid:
+            print(f" ✖ 無法解析影片 ID")
             continue
 
-        video_path = find_video_by_id(vid, VIDEO_FOLDER)
         if not video_path:
             print(f" ✖ 找不到影片：{vid}")
             continue
 
         print(f" ➤ 使用影片：{video_path}")
 
-        feats, reason = extractor.extract_features(video_path)
+        feats, reason = extractor.extract_features(video_path, start_sec=start_sec, end_sec=end_sec)
         if feats is None:
             print(f" ✖ 特徵提取失敗，原因 = {reason}")
             continue
