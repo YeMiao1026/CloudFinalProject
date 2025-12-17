@@ -1,34 +1,27 @@
-# render.yaml - Render service spec for this repo
-# Adjust 'plan' and repo/branch values as needed in the Render dashboard.
-
-static_sites:
-  - name: cloudfinal-ui
-    repo: https://github.com/YeMiao1026/CloudFinalProject
-    branch: main
-    # rootDir points to the folder containing package.json
-    rootDir: ui
-    buildCommand: npm install && npm run build
-    publishPath: dist
-    envVars:
-      - key: VITE_API_BASE
-        value: "https://cloudfinal-backend.onrender.com"
+# render.yaml - Render Blueprint spec
+# https://render.com/docs/blueprint-spec
 
 services:
   - type: web
     name: cloudfinal-backend
-    env: docker
+    runtime: docker
     repo: https://github.com/YeMiao1026/CloudFinalProject
     branch: main
-    dockerfilePath: pose_backend/Dockerfile
-    dockerContext: pose_backend
-    # plan: free
+    dockerfilePath: ./pose_backend/Dockerfile
+    dockerContext: ./pose_backend
     envVars:
       - key: PORT
         value: "8000"
       - key: PYTHONUNBUFFERED
         value: "1"
 
-# Notes:
-# - If you prefer to use Render's dashboard UI, you can create these services there and ignore this file.
-# - Replace api.example.com with the real domain/URL (or use the Render-provided URL).
-# - Render's "free" plan may have limits for CPU/memory and may not be suitable for heavy mediapipe workloads.
+staticSites:
+  - name: cloudfinal-ui
+    repo: https://github.com/YeMiao1026/CloudFinalProject
+    branch: main
+    rootDir: ui
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE
+        value: "https://cloudfinal-backend.onrender.com"
