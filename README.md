@@ -526,6 +526,7 @@ Cloud Computing Final Project - 2024/2025
 
 | 日期 | 提交 | 作者 | 訊息 |
 |------|------|------|------|
+| 2025-12-18T14:50:27+08:00 | [008bb71](https://github.com/YeMiao1026/CloudFinalProject/commit/008bb71b78367331fd344ea4ceffe9d248d7076b) | yemiao1026 | Merge branch 'main' of https://github.com/YeMiao1026/CloudFinalProject |
 | 2025-12-18T14:45:12+08:00 | [4bf9c96](https://github.com/YeMiao1026/CloudFinalProject/commit/4bf9c967b86f02bdfa866e6608599d2aefb8641b) | yemiao1026 | Implement feature X to enhance user experience and optimize performance |
 | 2025-12-18T00:28:00+08:00 | [ab04051](https://github.com/YeMiao1026/CloudFinalProject/commit/ab04051071eb697e3c669a10f65ce1a127ccefa0) | yemiao1026 | Refactor code structure for improved readability and maintainability |
 | 2025-12-18T00:05:39+08:00 | [e56ad25](https://github.com/YeMiao1026/CloudFinalProject/commit/e56ad250dd687d97bdbef20ddfe8e2514629e389) | yemiao1026 | docs: 新增線上 Demo URL (Render 部署) |
@@ -537,6 +538,95 @@ Cloud Computing Final Project - 2024/2025
 | 2025-12-11T20:58:53+08:00 | [68aa78a](https://github.com/YeMiao1026/CloudFinalProject/commit/68aa78a58a84145044b14b3e7672e4ca91046611) | C0ding_fArmer | Merge pull request #2 from YeMiao1026/standerduser-patch-1 |
 | 2025-12-11T20:49:54+08:00 | [257e526](https://github.com/YeMiao1026/CloudFinalProject/commit/257e5269c6ab37e86ae28150b91205982ad6dd96) | C0ding_fArmer | Add files via upload |
 | 2025-11-13T10:01:08+08:00 | [e856d9f](https://github.com/YeMiao1026/CloudFinalProject/commit/e856d9fb8c45ee5350c293729405214ff24d632c) | YeMiao1026 | Merge pull request #1 from YeMiao1026/Classroom-demonstration |
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+<!-- AUTO_COMMIT_TRACK_END -->
+
 <!-- AUTO_COMMIT_TRACK_END -->
 <!-- AUTO_COMMIT_TRACK_END -->
 <!-- AUTO_COMMIT_TRACK_END -->
